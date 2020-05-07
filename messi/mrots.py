@@ -12,8 +12,8 @@ class mrots:
     def __init__(self, lams, no_intercept=False,
                  sparse_omega=False, warm_start=False, n_iters=20):
         """
-        Implementation of a weighted version of MROTS model based on
-        (Rai, 2012), (Cai, 2014) and Iteratively Reweighted Least Squares(IRLS) algorithm.
+        A weighted version of MROTS model based on (Rai, 2012), (Cai, 2014)
+        and Iteratively Reweighted Least Squares (IRLS) algorithm.
 
         Args:
             lams: list of floats, parameters for the regularlizers
