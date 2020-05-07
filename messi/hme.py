@@ -1,18 +1,11 @@
-import sys
-import os
-import datetime
 import warnings
 from collections import defaultdict
 
-import matplotlib
 import numpy as np
-import pandas as pd
-from sklearn.linear_model import HuberRegressor, LinearRegression
+from sklearn.linear_model import LinearRegression
 from sklearn.linear_model import Lasso
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import mean_absolute_error
-from sklearn.metrics import mean_squared_error
 from sklearn.metrics import log_loss
 
 from mrots import mrots
@@ -22,12 +15,12 @@ from utils import *
 class hme:
 
     def __init__(self, n_classes_0, n_classes_1, model_name_gates, model_name_experts, num_responses,
-                 group_by_likelihood, idx_conditioned=None, conditional=False, init_labels_0=None,
+                 group_by_likelihood=True, idx_conditioned=None, conditional=False, init_labels_0=None,
                  init_labels_1=None, soft_weights=True, partial_fit_gate=False, partial_fit_expert=False,
                  tolerance=3, n_epochs=20, random_state=222):
         """
         Implementation of hierachical mixture model (Jordan & Jocab,1994) with various
-        options of gates or experts.
+        options for gates and experts.
 
         5/3/20:
         a. gates are 'hard', learning on labels (instead of soft as in (Jordan & Jocab,1994))
@@ -41,7 +34,7 @@ class hme:
             n_classes_0: integer, number of classes for the 1st layer; set as 1 if only allow 1 layer
             n_classes_1: integer, number of classes for the 2nd layer; equal to number of experts if only allow 1 layer
             model_name_gates: string, model for the classifiers/gates; any of "decision_tree", "logistic"
-            model_name_experts: string, model for the experts; any
+            model_name_experts: string, model for the experts; any of "mrots", "lasso" or "linear".
             num_responses: integer, number of response variables
             group_by_likelihood: boolean, if samples assigned to experts by likelihood; default true
             idx_conditioned: list of integers, index of response variables that are conditional for likelihood; default none
@@ -125,12 +118,12 @@ class hme:
 
             for i in range(self.n_classes_0):
                 for j in range(self.n_classes_1):
-                    self.model_experts[i][j] = mrots(lams, no_intercept=False, warm_start=_n_iters,
+                    self.model_experts[i][j] = mrots(lams, no_intercept=False, warm_start=_warm_star,
                                                      sparse_omega=False, n_iters=_n_iters)
 
         elif self.model_name_experts == 'lasso':
             if self.soft:
-                raise NotImplementedError(f"Weighted learning not available for LASSO for now.")
+                raise NotImplementedError(f"Weighted learning not available for lasso for now.")
             else:
                 if self.partial_fit_expert:
                     _max_iter = 1
@@ -158,7 +151,7 @@ class hme:
                     self.model_experts[i][j] = _models
 
         else:
-            raise NotImplementedError(f"Now only support for MROTS, LASSO or Linear Regression.")
+            raise NotImplementedError(f"Now only support for mrots, lasso or linear.")
 
     @staticmethod
     def train_gate(model, idx_subset, labels, X_train_clf, current_classes):
@@ -644,7 +637,7 @@ class hme:
 
                     if self.GROUP_BY_LIKELIHOOD:
                         # use assumed distribution (here multivariate Gaussian) for posterior probability
-                        if self.model_name_experts == 'MROTS':
+                        if self.model_name_experts == 'mrots':
                             # calculate likelihood with multivaraite Gaussian assumming dependence among responses
                             _likelihood = model.get_likelihood(Y_hat, Y_train, self.num_responses,
                                                                self.idx_conditioned, conditional=self.conditional)
@@ -657,7 +650,7 @@ class hme:
                             _likelihood = get_multigaussian_pdf(Y_hat, _cov, _cov_i, Y_train.shape[1], Y_train)
 
                         else:
-                            raise NotImplementedError(f"Now only support for MROTS, LASSO or Linear Regression.")
+                            raise NotImplementedError(f"Now only support for mrots, lasso or linear.")
 
                         likelihood_for_all.append(_likelihood)
 
@@ -816,7 +809,7 @@ class hme:
 
                     Y_hat = np.array(Y_hat).T
                 else:
-                    raise NotImplementedError(f"Now only support for MROTS, LASSO or Linear Regression.")
+                    raise NotImplementedError(f"Now only support for mrots, lasso or linear.")
 
                 Y_hat_all.append(Y_hat)
                 i += 1
