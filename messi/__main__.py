@@ -309,7 +309,7 @@ def main():
                 suffix = f"_{_i}"
 
             filename = f"hme_model{suffix}.pickle"
-            pickle.dump(model, open(os.path.join(input_path, filename), 'wb'))
+            pickle.dump(model, open(os.path.join(current_dir, filename), 'wb'))
 
             # predict the left-out animal
             if mode == 'CV':
@@ -320,7 +320,7 @@ def main():
                 print(f"Mean absolute value for {test_animal} is {mae}")
 
                 filename = f"test_predictions_{test_animal}_{_i}"
-                np.save(os.path.join(input_path, filename), Y_hat_final)
+                np.save(os.path.join(current_dir, filename), Y_hat_final)
 
 
 if __name__ == '__main__':
