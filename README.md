@@ -3,6 +3,16 @@ MESSI (**M**ixture of **E**xperts for **S**patial **S**ignaling genes **I**denti
 
 ![flowchart](./method_diagram.jpg)
 
+# Get started 
+## Prerequisites 
+* Python >= 3.7.3 
+* Python side-packages:
+-- scikit-learn >= 0.22.1
+-- scipy >= 1.3.0  
+-- numpy >= 1.16.3  
+-- pandas >= 0.25.3
+
+
 
 
 
