@@ -3,7 +3,7 @@ MESSI (**M**ixture of **E**xperts for **S**patial **S**ignaling genes **I**denti
 
 
 
-![MESSI framework](./method_diagram.jpg)
+![flowchart](./method_diagram.jpg)
 
 
 
