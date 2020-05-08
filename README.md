@@ -83,7 +83,7 @@ optional arguments:
   -c CELLTYPE, --cellType CELLTYPE
                         string, cell type that will be built a model for,
                         default 'Excitatory'
-  -m MODE, --mode MODE  string, any of 'train', 'CV ; if 'train', then all
+  -m MODE, --mode MODE  string, any of 'train','CV ; if 'train', then all
                         data will be used for training and output a pickle
                         file for learned parameters; if 'CV', then cross-
                         validation will be conducted each time with an
