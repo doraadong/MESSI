@@ -29,7 +29,7 @@ Execute the python file readyData.py by (for example):
 ```shell
 python readyData.py -i ../input/ -d merfish
 ```
-The usage of this file is listed as below: 
+The usage of this file is listed as follows:  
 
 ```shell
 usage: readyData.py [-h] -i INPUT -d DATATYPE
@@ -56,7 +56,7 @@ Execute the python file __main__.py by (for example):
 ```shell
 python __main__.py -i ../input/ -o ../output/ -d merfish -g Female -b Parenting -c Excitatory -m train -c1 1 -c2 8 -e 5
 ```
-The usage of this file is listed as below: 
+The usage of this file is listed as follows:  
 
 ```shell
 usage: __main__.py [-h] -i INPUT -o OUTPUT -d DATATYPE -g GENDER -b BEHAVIOR
