@@ -8,8 +8,8 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import log_loss
 
-from messi.mrots import mrots
-from messi.utils import *
+from mrots import mrots
+from utils import *
 
 
 class hme:
