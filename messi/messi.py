@@ -7,8 +7,8 @@ import pandas as pd
 import pickle
 from sklearn.cluster import AgglomerativeClustering
 
-from messi.data_processing import *
-from messi.hme import hme
+from data_processing import *
+from hme import hme
 
 
 def main():
