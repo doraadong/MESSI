@@ -6,7 +6,7 @@ import shutil
 import numpy as np
 import pandas as pd
 
-from messi.data_processing import *
+from data_processing import *
 
 
 
