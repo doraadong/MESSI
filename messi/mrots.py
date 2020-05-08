@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from sklearn.covariance import graphical_lasso
 
-from messi.utils import *
+from utils import *
 
 
 class mrots:
