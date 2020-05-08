@@ -115,7 +115,6 @@ optional arguments:
                         integer, optional, number of top dispersed signalling
                         genes to use as features, default None (to include all
                         signalling genes)
-
 ```
 
 
