@@ -51,15 +51,15 @@ Change to the sub directory by:
 ```shell
 cd ./messi 
 ```
-Execute the python file __main__.py by (for example): 
+Execute the python file messi.py by (for example): 
 
 ```shell
-python __main__.py -i ../input/ -o ../output/ -d merfish -g Female -b Parenting -c Excitatory -m train -c1 1 -c2 8 -e 5
+python messi.py -i ../input/ -o ../output/ -d merfish -g Female -b Parenting -c Excitatory -m train -c1 1 -c2 8 -e 5
 ```
 The usage of this file is listed as follows:  
 
 ```shell
-usage: __main__.py [-h] -i INPUT -o OUTPUT -d DATATYPE -g GENDER -b BEHAVIOR
+usage: messi.py [-h] -i INPUT -o OUTPUT -d DATATYPE -g GENDER -b BEHAVIOR
                    -c CELLTYPE -m MODE -c1 NUMLEVEL1 -c2 NUMLEVEL2 [-e EPOCHS]
                    [-r NUMREPLICATES] [-p PREPROCESS] [-tr TOPKRESPONSES]
                    [-ts TOPKSIGNALS]
