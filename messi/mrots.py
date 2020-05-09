@@ -8,12 +8,14 @@ from utils import *
 
 
 class mrots:
-
-    def __init__(self, lams, no_intercept=False,
-                 sparse_omega=False, warm_start=False, n_iters=20):
-        """
-        A weighted version of MROTS model based on (Rai, 2012), (Cai, 2014)
+    """
+            A weighted version of MROTS model based on (Rai, 2012), (Cai, 2014)
         and Iteratively Reweighted Least Squares (IRLS) algorithm.
+    """
+
+    def __init__(self, lams, no_intercept=False, sparse_omega=False,
+                 warm_start=False, n_iters=20, verbose = False):
+        """
 
         Args:
             lams: list of floats, parameters for the regularlizers
@@ -24,11 +26,14 @@ class mrots:
         """
         self.lam, self.lam1, self.lam2, self.lam3 = lams[0], lams[1], \
                                                     lams[2], lams[3]
-        print(f"Parameters for regularlizers are: {lams}")
         self.no_intercept = no_intercept
         self.sparse_omega = sparse_omega
         self.n_iters = n_iters
         self.warm_start = warm_start
+        self.verbose = verbose
+
+        if self.verbose:
+            print(f"Parameters for regularlizers are: {lams}")
 
         # initalize parametes as None
         self.omega, self.sigma, self.omega_i, self.sigma_i, self.W, self.b = None, None, \
@@ -65,7 +70,8 @@ class mrots:
                 self.omega, self.sigma, self.omega_i, self.sigma_i, self.W, self.b
 
         else:
-            print('NOT WARM-START!')
+            if self.verbose:
+                print('NOT WARM-START!')
             # initialize
             omega = np.identity(K)
             sigma = np.identity(K)
@@ -86,7 +92,8 @@ class mrots:
                                      sigma_i, W, b, N, D, sample_weight=sample_weight)
         best_overall_score = pre_obj
         obj.append(pre_obj)
-        print(f"Starting objective is {pre_obj}")
+        if self.verbose:
+            print(f"Starting objective is {pre_obj}")
 
         for n in range(0, self.n_iters):
             omega, omega_i = self.update_omega(X, Y, W, b, N, K, sample_weight=sample_weight)
@@ -105,7 +112,8 @@ class mrots:
             cur_obj = self.get_objective(X, Y, omega, omega_i, sigma,
                                          sigma_i, W, b, N, D, sample_weight=sample_weight)
             obj.append(cur_obj)
-            print(f"Current objective is {cur_obj}")
+            if self.verbose:
+                print(f"Current objective is {cur_obj}")
 
             if best_overall_score > cur_obj:
                 best_overall_score, best_epoch = cur_obj, n
