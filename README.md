@@ -116,9 +116,10 @@ optional arguments:
 # Tutorials
 See [tutorials/MESSI_merfish_hypothalamus.ipynb](tutorials/MESSI_merfish_hypothalamus.ipynb), for a detailed intro on how to train and test a MESSI model, to infer signaling genes and subtypes from the learned parameters and other possible model configurations. 
 
+# Credits
+Group members from [System Biology Group @ Carnegie Mellon University](http://sb.cs.cmu.edu/).  
 
 # Contacts
-* [System Biology Group @ Carnegie Mellon University](http://sb.cs.cmu.edu/).  
 * dongshul at andrew.cmu.edu 
 
 # License 
