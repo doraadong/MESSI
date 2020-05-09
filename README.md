@@ -20,11 +20,11 @@ sudo pip3 install --upgrade  https://github.com/doraadong/MESSI/tarball/master
 
 # Command-line usage 
 
-## Download data and convert to required formats using utils/readyData.py:
+## Download expression data and convert to required formats:
 
 Download the script [utils/readyData.py](utils/readyData.py). 
 
-Execute the python file (arguments are taken for example): 
+Execute this python script by (arguments are taken for example): 
 
 ```shell
 python readyData.py -i ../input/ -d merfish
