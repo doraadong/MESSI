@@ -54,10 +54,10 @@ messi -i ../input/ -o ../output/ -d merfish -g Female -b Parenting -c Excitatory
 The usage of this file is listed as follows:  
 
 ```shell
-usage: messi.py [-h] -i INPUT -o OUTPUT -d DATATYPE -g GENDER -b BEHAVIOR
-                   -c CELLTYPE -m MODE -c1 NUMLEVEL1 -c2 NUMLEVEL2 [-e EPOCHS]
-                   [-r NUMREPLICATES] [-p PREPROCESS] [-tr TOPKRESPONSES]
-                   [-ts TOPKSIGNALS]
+usage: messi [-h] -i INPUT -o OUTPUT -d DATATYPE -g GENDER -b BEHAVIOR -c
+             CELLTYPE -m MODE -c1 NUMLEVEL1 -c2 NUMLEVEL2 [-e EPOCHS]
+             [-r NUMREPLICATES] [-p PREPROCESS] [-tr TOPKRESPONSES]
+             [-ts TOPKSIGNALS]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -76,9 +76,10 @@ optional arguments:
                         string, behavior of input animal sample, default
                         'Naive', put 'na' if not available
   -c CELLTYPE, --cellType CELLTYPE
-                        string, cell type that will be built a model for,
-                        default 'Excitatory'
-  -m MODE, --mode MODE  string, any of 'train','CV'; if 'train', then all
+                        string, cell type that will be built a model for, use
+                        \ for white-space, e.g. 'OD\ Mature\ 2', default
+                        'Excitatory'
+  -m MODE, --mode MODE  string, any of 'train', 'CV'; if 'train', then all
                         data will be used for training and output a pickle
                         file for learned parameters; if 'CV', then cross-
                         validation will be conducted each time with an
