@@ -22,7 +22,7 @@ sudo pip3 install --upgrade  https://github.com/doraadong/MESSI/tarball/master
 
 ## Download data and convert to required formats using utils/readyData.py:
 
-Download the script [utils/readData.py](../utils/readData.py). 
+Download the script [utils/readyData.py](utils/readyData.py). 
 
 Execute the python file (arguments are taken for example): 
 
@@ -114,7 +114,7 @@ optional arguments:
 
 # Tutorials
 
-See **[tutorials/ MESSI_merfish_hypothalamus.ipynb] (tutorials/ MESSI_merfish_hypothalamus.ipynb)**, for a detailed intro on how to train and test a MESSI model, to infer signaling genes and subtypes from the learned parameters and other possible model configurations. 
+See [tutorials/MESSI_merfish_hypothalamus.ipynb](tutorials/MESSI_merfish_hypothalamus.ipynb), for a detailed intro on how to train and test a MESSI model, to infer signaling genes and subtypes from the learned parameters and other possible model configurations. 
 
 
 
