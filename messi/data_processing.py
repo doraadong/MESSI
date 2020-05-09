@@ -1,852 +1,1317 @@
-import warnings
-from collections import defaultdict
+"""
+Functions for processing data for MESSI.
+
+This includes functions to read helper data (e.g., ligand, receptor list), to read
+various types of expression data and their meta data, to construct neighberhood graph and find
+neighbors and to prepare features and response variables.
+
+"""
+
+import os
 
 import numpy as np
-from sklearn.linear_model import LinearRegression
-from sklearn.linear_model import Lasso
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import log_loss
+import pandas as pd
+from scipy.spatial import Delaunay
+from scipy.spatial.distance import pdist, squareform
+from sklearn.neighbors import kneighbors_graph
+from sklearn import preprocessing
+from sklearn.preprocessing import PolynomialFeatures
 
-from mrots import mrots
-from utils import *
+# ------ read data ------
 
+# tool data
+def get_lr_pairs(filename = 'ligand_receptor_pairs2.txt', input_path = 'input/'):
+    """
+    Process and read in the ligand and receptor list.
 
-class hme:
+    Args:
+        filename: string, filename of the ligand and receptor list
+        input_path:
+
+    Returns:
+        l_u: set of ligands
+        r_u: set of receptors
+
+    """
+    lr_pairs = pd.read_table(os.path.join(input_path, filename), header = None)
+    lr_pairs.columns = ['ligand','receptor']
+    lr_pairs['ligand'] = lr_pairs['ligand'].apply(lambda x: x.upper())
+    lr_pairs['receptor'] = lr_pairs['receptor'].apply(lambda x: x.upper())
+    l_u_p = set([l.upper() for l in lr_pairs['ligand']])
+    r_u_p = set([g.upper() for g in lr_pairs['receptor']])
+
+    l_u_search = set(['CBLN1', 'CXCL14', 'CBLN2', 'VGF','SCG2','CARTPT','TAC2'])
+    r_u_search = set(['CRHBP', 'GABRA1', 'GPR165', 'GLRA3', 'GABRG1', 'ADORA2A'])
+
+    l_u = l_u_p.union(l_u_search)
+    r_u = r_u_p.union(r_u_search)
+
+    return l_u, r_u
+
+# meta data
+def read_meta_merfish(input_path, behavior_no_space, sex):
+    """
+    Get meta data of merfish hypothalamus datasets.
+
+    Returns:
+        meta_all: numpy array, sample size x meta features, meta data (e.g., animal ID or bregma) for a cell
+        meta_all_columns: dictionary, use column name as key for column index
+        cell_types_dict: dictionary, cell type as key and 0 as value; include all available cell types
+        genes_list: list of strings, all genes that are profiled in the dataset
+        genes_list_u: list of strings, same as genes_list but all letters are in uppercase
+
     """
 
-     Implementation of hierachical mixture model (Jordan & Jocab,1994) with various
-        options for gates and experts.
+    # get default values (genes names, all cell types ) from a sample dataset
+    filename = f"merfish_animal1_bregma026.csv"
+    sample = pd.read_csv(os.path.join(input_path, filename), header=0)
 
-        5/3/20:
-        a. gates are 'hard', learning on labels (instead of soft as in (Jordan & Jocab,1994))
-        b. stopping criterion
-            1. based on training set; instead of validation set
-            2. based on errors instead of objective Q(,)
-        c. in training, if no sample assigned to a class then the class will be removed
+    # remove columns for quality control
+    genes_list = list(sample.columns[9:])
+    remove = set(genes_list[12:17]).union(set(['Fos']))  # use Fos for validation only
+    print(f"Removed genes: {remove}")
+
+    for r in list(remove):
+        genes_list.remove(r)
+
+    genes_list_u = [g.upper() for g in genes_list]
+
+    cell_types_dict = sample['Cell_class'].value_counts().to_dict()
+
+    for k, v in cell_types_dict.items():
+        cell_types_dict[k] = 0
+
+    full_cell_types = list(cell_types_dict.keys())
+    print(f"Total number of cell types for merfish: {len(full_cell_types)}")
+
+
+    # get meta info for current samples
+    filename = f"merfish_meta_{behavior_no_space}_{sex}.csv"
+    meta_all = pd.read_csv(os.path.join(input_path, filename))
+    meta_all_columns = dict(zip(meta_all.columns, range(0,len(meta_all.columns))))
+    meta_all = meta_all.to_numpy()
+
+    return meta_all, meta_all_columns, cell_types_dict, genes_list, genes_list_u
+
+
+# input data
+# parameters for merfish
+bregmas_all = [-0.29, -0.24, -0.19, -0.14, -0.09, -0.04, 0.01, 0.06, 0.11, 0.16, 0.21, 0.26]
+female_ids = range(1,5)
+male_ids = range(5,12)
+
+def read_merfish_cell_line_data(input_path, bregma, animal_id, genes_list):
+    """
+
+    Read a subset of expression data by animal id and bregma (only for merfish
+    hypothalamus).
+
+    Returns:
+        hp_cor: pandas DataFrame, spatial coordinates
+        hp_genes: pandas DataFrame, gene expressions
+
+    """
+    try:
+        filename = f"expression_cor_dispersion_6000_{animal_id}.csv"
+        print(f"Reading file: {filename}")
+        sample = pd.read_csv(os.path.join(input_path, filename), header=0)
+
+        print(f"The dimensions of the sample is: {sample.shape}")
+
+        hp = sample.copy()
+        hp_cor = hp[['x_microns', 'y_microns']]
+        print(hp_cor.shape)
+        hp_genes = hp[genes_list]
+        print(hp_genes.shape)
+        hp_genes.columns = [g.upper() for g in hp_genes.columns]
+
+        return None, hp_cor, hp_genes
+
+    except FileNotFoundError:
+        print(f"No file exist for this {bregma} of {animal_id}")
+
+def read_merfish_data(input_path, bregma, animal_id, genes_list):
+    """
+
+    Read a subset of expression data by animal id and bregma (only for merfish
+    hypothalamus).
+
+    Returns:
+        hp: pandas DataFrame, meta data
+        hp_cor: pandas DataFrame, spatial coordinates
+        hp_genes: pandas DataFrame, gene expressions
+
+    """
+    
+    try:
+        bregma_format = ''.join(str(bregma).split('.'))
+        
+        filename = f"merfish_animal{animal_id}_bregma{bregma_format}.csv"
+        print(f"Reading file: {filename}")
+        sample = pd.read_csv(os.path.join(input_path, filename), header = 0)
+
+        print (f"The dimensions of the sample is: {sample.shape}")
+
+        hp = sample.copy()
+        hp_cor = hp[['Centroid_X','Centroid_Y']]
+        hp_genes = hp[genes_list]
+        hp_genes.columns = [g.upper() for g in hp_genes.columns]
+
+        return hp.iloc[:, :9], hp_cor, hp_genes
+
+    except FileNotFoundError:
+        print(f"No file exist for this {bregma} of {animal_id}")
+        
+def read_starmap_combinatorial(input_path, animal_id, genes_list):
 
     """
 
-    def __init__(self, n_classes_0, n_classes_1, model_name_gates, model_name_experts, num_responses,
-                 group_by_likelihood=True, idx_conditioned=None, conditional=False, init_labels_0=None,
-                 init_labels_1=None, soft_weights=True, partial_fit_gate=False, partial_fit_expert=False,
-                 tolerance=3, n_epochs=20, random_state=222):
-        """
+    Read a subset of expression data by animal id and bregma (only for merfish
+    hypothalamus).
 
-        Args:
-            n_classes_0: integer, number of classes for the 1st layer; set as 1 if only allow 1 layer
-            n_classes_1: integer, number of classes for the 2nd layer; equal to number of experts if only allow 1 layer
-            model_name_gates: string, model for the classifiers/gates; any of "decision_tree", "logistic"
-            model_name_experts: string, model for the experts; any of "mrots", "lasso" or "linear".
-            num_responses: integer, number of response variables
-            group_by_likelihood: boolean, if samples assigned to experts by likelihood; default true
-            idx_conditioned: list of integers, index of response variables that are conditional for likelihood; default none
-            conditional: boolean, if likelihood is conditional or not; default false
-            init_labels_0: list of integers, cluster labels (starting from 0) for level 1, N x 1, initialized grouping of samples; default none
-            init_labels_1: list of list of integers, cluster labels (starting from 0) for level 2, initialized grouping of samples; default none
-            soft_weights: boolean, if apply soft grouping of samples; default true
-            partial_fit_gate: boolean, run for 1 epoch only, using all training samples; default false
-            partial_fit_expert: boolean, run for 1 epoch only, using all training samples; default false
-            tolerance: integer, number of epochs to run after reaching the best epoch before stopping; default 3
-            n_epochs: integer, total number of epochs; default 20
-            random_state: integer, random state applying to numpy.random.choice or experts/classifiers
+    Returns:
+        meta: pandas DataFrame, meta data
+        cor: pandas DataFrame, spatial coordinates
+        genes: pandas DataFrame, gene expressions
 
-        Raises:
-            NotImplementedError: some experts or gates models are not supported
-        """
+    """
+    
+    try:
+        filename = f"meta_mPEC_{animal_id}.csv"
+        print(f"Reading file: {filename}")
+        meta = pd.read_csv(os.path.join(input_path, filename), header = 0)
+        # meta = meta_all[meta_all['Animal_ID'] == animal_id]
+        print (f"The dimensions of the meta is: {meta.shape}")
 
-        self.n_classes_0 = n_classes_0
-        self.n_classes_1 = n_classes_1
-        self.model_name_gates = model_name_gates
-        self.model_name_experts = model_name_experts
-        self.num_responses = num_responses
-        self.GROUP_BY_LIKELIHOOD = group_by_likelihood
-        self.idx_conditioned = idx_conditioned
-        self.conditional = conditional
-        self.init_labels_0 = init_labels_0
-        self.init_labels_1 = init_labels_1
-        self.soft = soft_weights
-        self.partial_fit_gate = partial_fit_gate
-        self.partial_fit_expert = partial_fit_expert
-        self.n_epochs = n_epochs
-        self.tolerance = tolerance
-        self.random_state = random_state
-        self.MULTITASK = False  # if expert is multi-task; default false
-        self.weights = None  # expert weights; used in training
-        self.labels_0 = None  # sample labels; used in training
-        self.labels_1 = None  # sample labels; used in training
-        self.labels_all = None  # sample labels; used in training
-        self.idx_expert = None  # expert labels; used in prediction
-        self.probs_expert = None  # expert weights; used in prediction
+        filename = f"coordinates_{animal_id}.npy"
+        print(f"Reading file: {filename}")
+        cor = pd.DataFrame(np.load(os.path.join(input_path, filename)))
+        cor.columns = ['Centroid_X','Centroid_Y']
+        print (f"The dimensions of the cor is: {cor.shape}")
+        
+        filename = f"cell_barcode_count_{animal_id}.csv"
+        print(f"Reading file: {filename}")
+        genes = pd.read_csv(os.path.join(input_path, filename), header = None)
+        genes.columns = genes_list
+        print (f"The dimensions of the expression is: {genes.shape}")
 
-        # initialize gates
-        # -1 for the level 1 gate; level 2 gates are labeled by level 1 classes
-        _keys = [-1] + list(range(self.n_classes_0))
+        return meta, cor, genes
+    except FileNotFoundError:
+        print(f"No file exist for this {input_path} of {animal_id}")
 
-        if self.model_name_gates == 'decision_tree':
-            if self.partial_fit_gate:
-                raise NotImplementedError(f"Paritial fit not available for decision tree for now.")
+        
+        
+def read_merfish_rna_seq_data(input_path, sex, animal_id, condition, genes_list=None):
+    """
+
+    Read a subset of expression data by animal id and bregma (only for merfish
+    hypothalamus).
+
+    Returns:
+        hp: pandas DataFrame, meta data
+        hp_genes: pandas DataFrame, gene expressions
+
+    """
+    try:
+        filename = f"merfish_rna_seq_meta_{sex}_{animal_id}.csv"
+        hp = pd.read_csv(os.path.join(input_path, filename), header = 0)
+        print(f"Reading file: {filename}")
+
+        if 'prior' in condition:
+            filename = f"expression_{sex}_{animal_id}_prior.npy"
+        else:
+            filename = f"expression_{sex}_{animal_id}.npy"
+        hp_genes = np.load(os.path.join(input_path, filename))
+        print(f"Reading file: {filename}")
+        print(f"The dimensions of the sample is: {hp_genes.shape}")
+
+        return hp, None, hp_genes.T
+
+    except FileNotFoundError:
+        print(f"No file exist for this of {animal_id}")
+
+
+# ------ data pre-processing 
+# TBD:
+# Now use a lot memory for datasets:
+# 1. do not store all datasets! only need to process each one at a time 
+
+
+
+# --- get index of train and test 
+def find_idx_for_train_test(samples_train, samples_test, meta_all, 
+                            meta_all_columns, data_type, current_cell_type, 
+                            get_idx_per_dataset, return_in_general=True, bregma=None):
+    """
+    Get index of individual cells for given lists of a training and testing samples/animals.
+    
+    Args:
+        samples_id_train: list, sample ID for training data; here sample might be 'animals'(merFISH) or 'FOV'(seqFISH+)
+        samples_id_test: list, sample ID for testing data; here sample might be 'animals'(merFISH) or 'FOV'(seqFISH+)
+        meta_all: numpy array, sample size x meta features, meta data (e.g., animal ID or bregma) for all cells of \
+the same condition (say, all naive animals)
+        meta_all_columns: dictionary, use column name as key for column index
+
+    Returns:
+        idx_train: list, index of training cells in meta_all 
+        idx_test: list, index of testing cells in meta_all
+        
+        idx_train_in_general:list, index of training cells in the general (all cell types) list
+        idx_test_in_general:list, index of testing cells in the general (all cell types) list
+        
+        idx_train_in_dataset: list of list of index of training cells in each dataset (as grouped by animal & bregma)
+        idx_test_in_dataset: list of list of index of testing cells in each dataset (as grouped by animal & bregma)
+        
+        meta_per_dataset_train: list of list of ['animal_id', 'bregma'] for each dataset of training 
+        meta_per_dataset_test: list of list of ['animal_id', 'bregma'] for each dataset of testing 
+
+    """
+    if data_type == 'seqfish':
+    
+        idx_train_general = []
+        for fov in samples_train:
+            idx_train_general = idx_train_general + list(meta_all.index[meta_all['Field of View'] == fov].values)
+
+        idx_test_general = []
+        for fov in samples_test:
+            idx_test_general = idx_test_general + list(meta_all.index[meta_all['Field of View'] == fov].values)
+            
+        # for current_cell_type in cell_types:
+        print(f"Preprocess for {current_cell_type} of {data_type}")
+
+        # select cells for a particular cell type 
+        if current_cell_type == 'general':
+            idx_train = idx_train_general
+            idx_test = idx_test_general
+
+        else:
+            idx_train = []
+            for fov in samples_train:
+                idx_train = idx_train + list(meta_all.index[(meta_all['Field of View'] == fov) & (meta_all['cell_types'] == current_cell_type)])
+
+            idx_test = []
+            for fov in samples_test:
+                idx_test = idx_test + list(meta_all.index[(meta_all['Field of View'] == fov) & (meta_all['cell_types'] == current_cell_type)])
+
+        idx_train_in_general = [idx_train_general.index(i) for i in idx_train]
+        idx_test_in_general = [idx_test_general.index(i) for i in idx_test]
+        
+        print(len(idx_train))
+        print(len(idx_test))
+        
+        return idx_train, idx_test, idx_train_in_general, idx_test_in_general, None, None, None, None
+    
+    elif 'merfish' in data_type or data_type == 'starmap': 
+        
+         # for current_cell_type in cell_types:
+        print(f"Preprocess for {current_cell_type} of {data_type}")
+        
+        idx_train_general = []
+        for animal in samples_train:
+            idx_train_general = idx_train_general + list(np.where(meta_all[:, meta_all_columns['Animal_ID']] == animal)[0])
+
+        idx_test_general = []
+        for animal in samples_test:
+            idx_test_general = idx_test_general + list(np.where(meta_all[:, meta_all_columns['Animal_ID']] == animal)[0])
+        
+        # select cells for a particular cell type  
+        if current_cell_type == 'general':
+        
+            idx_train, idx_train_in_dataset, meta_per_dataset_train = \
+            get_idx_per_dataset(samples_train,meta_all,meta_all_columns, bregma)
+            idx_test, idx_test_in_dataset, meta_per_dataset_test = \
+            get_idx_per_dataset(samples_test,meta_all, meta_all_columns, bregma)
+        else:
+            idx_train, idx_train_in_dataset, meta_per_dataset_train  = \
+            get_idx_per_dataset(samples_train, meta_all, meta_all_columns, bregma, current_cell_type)
+            idx_test, idx_test_in_dataset, meta_per_dataset_test  = \
+            get_idx_per_dataset(samples_test, meta_all, meta_all_columns, bregma, current_cell_type)
+        
+        print(len(idx_train))
+        print(len(idx_test))
+        
+        # cost MUCH time! TBD: concatenate baseline result --> 
+        # no need to have idx_train_in_general for response_type == 'original'
+
+        if return_in_general:
+            idx_train_in_general = [idx_train_general.index(i) for i in idx_train]
+            idx_test_in_general = [idx_test_general.index(i) for i in idx_test]
+
+            return idx_train, idx_test, idx_train_in_general, idx_test_in_general, idx_train_in_dataset, \
+                    idx_test_in_dataset, meta_per_dataset_train, meta_per_dataset_test
+        else:
+            return idx_train, idx_test, None, None, idx_train_in_dataset, \
+                   idx_test_in_dataset, meta_per_dataset_train, meta_per_dataset_test
+
+        
+    else:
+        print("Please provide a data type. Only 'seqfish','merfish' or 'starmap' is supported.")
+        
+        return None, None, None, None, None, None, None, None
+
+
+def get_idx_per_dataset_merfish_cell_line(samples, meta_all, meta_all_columns,
+                                        single_bregma=None, current_cell_type=None):
+    """
+    Helper function for find_idx_for_train_test.
+
+    """
+
+    idx_in_all = []
+    idx_in_dataset = []
+    meta_per_dataset = []
+
+    for animal in samples:
+        print(animal)
+
+        _condition = (meta_all[:, meta_all_columns['Animal_ID']] == animal)
+
+        #         _idx_in_all = list(meta_all.index[_condition].values)
+        #         idx_in_all = idx_in_all + _idx_in_all
+
+        _subidx = np.where(_condition)[0]
+        _subset = meta_all[_condition, :]
+        idx_in_all_animal = list(_subidx)
+        idx_in_dataset.append(list(_subset[:, meta_all_columns['ID_in_dataset']]))
+        meta_per_dataset.append([animal, None])
+
+        idx_in_all = idx_in_all + idx_in_all_animal
+
+    return idx_in_all, idx_in_dataset, meta_per_dataset
+
+def get_idx_per_dataset_starmap_combinatorial(samples, meta_all, meta_all_columns, 
+                                        single_bregma = None, current_cell_type = None):
+    """
+
+    Helper function for find_idx_for_train_test.
+
+    """
+
+    idx_in_all = []
+    idx_in_dataset = []
+    meta_per_dataset = []  
+
+    for animal in samples:
+        print(animal)
+
+        if current_cell_type is not None:
+            _condition = (meta_all[:, meta_all_columns['Animal_ID']] == animal) & \
+            (meta_all[:, meta_all_columns['Cell_class']] == current_cell_type)
+        else:
+            _condition = (meta_all[:, meta_all_columns['Animal_ID']] == animal)
+
+    #         _idx_in_all = list(meta_all.index[_condition].values)
+    #         idx_in_all = idx_in_all + _idx_in_all
+
+        _subidx = np.where(_condition)[0]
+        _subset = meta_all[_condition,:]
+        idx_in_all_animal = list(_subidx)
+        idx_in_dataset.append(list(_subset[:,meta_all_columns['ID_in_dataset']]))
+        meta_per_dataset.append([animal, None])
+
+        idx_in_all = idx_in_all + idx_in_all_animal 
+
+    return idx_in_all, idx_in_dataset, meta_per_dataset
+
+# get_idx_per_dataset_merfish_rna_seq = get_idx_per_dataset_starmap_combinatorial()
+
+
+def get_idx_per_dataset_merfish(samples, meta_all, meta_all_columns, single_bregma = None, current_cell_type = None):
+    """
+
+    Helper function for find_idx_for_train_test.
+
+    """
+
+    idx_in_all = []
+    idx_in_dataset = []
+    meta_per_dataset = []  
+
+    for animal in samples:
+
+        if current_cell_type is not None:
+            _condition = (meta_all[:, meta_all_columns['Animal_ID']] == animal) & \
+            (meta_all[:, meta_all_columns['Cell_class']] == current_cell_type)
+        else:
+            _condition = (meta_all[:, meta_all_columns['Animal_ID']] == animal)
+
+    #         _idx_in_all = list(meta_all.index[_condition].values)
+    #         idx_in_all = idx_in_all + _idx_in_all
+        if single_bregma is not None:
+            uniques = [single_bregma]
+        else:
+            uniques = meta_all[:, meta_all_columns['Bregma']][_condition]
+
+        _bregmas = [b for b in bregmas_all if b in uniques]
+        idx_in_all_animal = []
+
+        for bregma in _bregmas:
+
+            if current_cell_type is not None:
+                _condition = (meta_all[:, meta_all_columns['Animal_ID']] == animal) & \
+                (meta_all[:, meta_all_columns['Cell_class']] == current_cell_type) & \
+                (meta_all[:, meta_all_columns['Bregma']] == bregma)
             else:
-                self.model_gates = {key: DecisionTreeClassifier(random_state=self.random_state, max_depth=5)
-                                    for key in _keys}
+                _condition = (meta_all[:, meta_all_columns['Animal_ID']] == animal) & \
+                (meta_all[:, meta_all_columns['Bregma']] == bregma)
 
-        elif self.model_name_gates == 'logistic':
-            if self.partial_fit_gate:
-                _max_iter = 1
-            else:
-                _max_iter = 1e6
+            _subidx = np.where(_condition)[0]
+            _subset = meta_all[_condition,:]
+            idx_in_all_animal = idx_in_all_animal + list(_subidx)
+            idx_in_dataset.append(list(_subset[:,meta_all_columns['ID_in_dataset']]))
+            meta_per_dataset.append([animal,bregma])
 
-                self.model_gates = {key: LogisticRegression(random_state=self.random_state, solver='lbfgs',
-                                                            multi_class='multinomial', penalty='l2', max_iter=_max_iter)
-                                    for key in _keys}
+        idx_in_all = idx_in_all + idx_in_all_animal 
+
+    return idx_in_all, idx_in_dataset, meta_per_dataset
+
+
+# --- find neighbors
+
+def find_neighbors(pindex, tri):
+    """
+    By @user2535797 at https://stackoverflow.com/questions/12374781/how-to-find-all-neighbors-of-a-given-point-\
+    in-a-delaunay-triangulation-using-sci
+
+    Args:
+        pindex: a index of a single point
+        tri: output from scipy.Delaunay() method
+
+    Returns:
+        neighbors for a data point
+
+    """
+    return tri.vertex_neighbor_vertices[1][tri.vertex_neighbor_vertices[0][pindex]:tri.vertex_neighbor_vertices[0][pindex+1]]
+
+
+def get_Delaunay_neighbors(X, dis_filter = 100, include_self = True):
+    """
+    Get neighbors based on Delaunay triangulation and physical distance filters.
+
+    Args:
+        X: np.array or pd.DataFrame, first dimension as data points and 2nd dimension as features
+        include_self:boolean, if include self in neighbors
+        dis_filter: integer, distance in micrometers to filter neighbor pairs; default 100
+        include_self: boolean, if to include the point itself as its neighbors; default true
+
+     Return:
+        neighbors_filtered: list, neighbors filtered by euclidean distance ordered as in X
+    """
+    tri = Delaunay(X)
+    distmat = squareform(pdist(X, 'euclidean'))
+    neighbors_filtered = []
+    
+    for i in range(0, X.shape[0]):
+        neighbors = find_neighbors(i,tri)
+        temp = neighbors[distmat[i,neighbors] < dis_filter]
+        
+        if include_self:
+            np.append(temp,i)
+
+        neighbors_filtered.append(temp)
+        
+    return neighbors_filtered
+
+def get_neighbors_datasets(data_sets, neighbor_type, k=10, dis_filter=100, include_self = True):
+    """
+
+    Process each dataset one by one to get neighbors for each single cell.
+
+    Returns:
+        neighbors_all: list of numpy arrays, each containing neighboring info of a dataset
+
+    """
+    
+    neighbors_all = []
+    
+    for i in range(len(data_sets)):
+        _, _, current_cor, _, _,_ = data_sets[i]
+        
+        if neighbor_type == 'Del':
+            _nn = get_Delaunay_neighbors(current_cor, dis_filter=dis_filter, include_self=include_self)
+
+        elif neighbor_type == 'k-nn':
+            _nn_g = kneighbors_graph(current_cor, k=k, mode='connectivity', include_self=include_self)
+            _nn = _nn_g.toarray()
+        
+        neighbors_all.append(_nn)
+        
+    return neighbors_all
+
+
+# --- process X 
+
+def prepare_features(data_type, datasets_train, datasets_test, meta_per_dataset_train, meta_per_dataset_test, idx_train,
+                     idx_test, idx_train_in_dataset, idx_test_in_dataset,
+                     neighbors_train, neighbors_test,
+                     feature_types, regulator_list_prior, top_k_regulator,
+                     genes_filtered, l_u, r_u, cell_types_dict):
+    """
+
+    Generate different types of features.
+
+    Args:
+        data_type: string, merfish/starmap/merfish_cell_line
+        datasets_train: list of numpy arrays & dictionaries; all info for training samples;in the format
+            [current_meta, gene_exp, current_cor]
+        datasets_test: list of numpy arrays & dictionaries; all info for testing samples;in the format
+            [current_meta, gene_exp, current_cor]
+        meta_per_dataset_train: list of list of ['animal_id', 'bregma'] for each dataset of training
+        meta_per_dataset_test: list of list of ['animal_id', 'bregma'] for each dataset of testing
+        idx_train: list, index of training cells in the meta dataset containing all samples for a particular behavior
+        idx_test: list, index of testing cells in the meta dataset containing all samples for a particular behavior
+        idx_train_in_dataset: list of list of index of training cells in each dataset (as grouped by animal & bregma)
+        idx_test_in_dataset: list of list of index of testing cells in each dataset (as grouped by animal & bregma)
+        neighbors_train: list of numpy arrays, neighboring info for the training samples
+        neighbors_test: list of numpy arrays, neighboring info for the testing samples
+        feature_types: dictionary, each specifying parameters of a particular feature type
+        regulator_list_prior: list of strings, ligand or receptor list known as prior
+        top_k_regulator: integer, top K ligand/receptors to be used as features; the features will be sorted \
+        according to dispersion (descending); default None
+        genes_filtered: list of strings, all genes profiled in the expression data; all letters are in uppercase
+        l_u: list of strings, ligands from the database; all letters are in uppercase
+        r_u: list of strings, receptors from the database; all letters are in uppercase
+        cell_types_dict: dictionary, cell type as key and 0 as value; include all available cell types
+
+    Returns:
+        X_trains: dictionary, each item for a type of features
+        X_tests: dictionary, each item for a type of features
+        regulator_list_neighbor: list of strings, ligands used as features for neighboring cells' expression
+        regulator_list_self: list of strings, ligands and receptors used as features for cell's own expression
+
+    """
+
+    if regulator_list_prior is not None:
+        regulator_list_neighbor = [g for g in regulator_list_prior if g in l_u]
+        regulator_list_self = [g for g in regulator_list_prior if g in r_u]
+        total_regulators = regulator_list_neighbor + regulator_list_self
+    else:
+        regulator_list_neighbor = [g for g in genes_filtered if g in l_u]
+        regulator_list_self = [g for g in genes_filtered if g in r_u]
+        total_regulators = regulator_list_neighbor + regulator_list_self
+
+    # initialize
+    X_trains = {'regulators_neighbor': None, 'regulators_self': None, 'neighbor_type': None, 'baseline': None,
+                'regulators_neighbor_self': None, 'regulators_neighbor_by_type': None}
+    X_tests = {'regulators_neighbor': None, 'regulators_self': None, 'neighbor_type': None, 'baseline': None,
+               'regulators_neighbor_self': None, 'regulators_neighbor_by_type': None}
+
+    for i in range(0, len(feature_types)):
+        feature_type = feature_types[i]
+        feature_name = feature_type['name']
+        print(f"Now prepare for feature: {feature_name}")
+
+        preprocess_X = feature_type['helper']
+
+        feature_list_type = feature_type['feature_list_type']
+        if feature_list_type == 'regulator_neighbor':
+            feature_list = regulator_list_neighbor
+        elif feature_list_type == 'regulator_self':
+            feature_list = regulator_list_self
         else:
-            raise NotImplementedError(f"Now only support decision_tree or logistic")
+            feature_list = None
 
-        # initialize experts
-        self.model_experts = defaultdict(dict)
+        per_cell = feature_type['per_cell']
+        baseline = feature_type['baseline']
 
-        # initialize the number of experts, equals to the product of the number of classes in layer 1 & layer 2
-        self.n_experts = self.n_classes_0 * self.n_classes_1
+        data_sets = datasets_train
+        meta_per_dataset = meta_per_dataset_train
+        current_idxs = idx_train_in_dataset
+        current_nns = neighbors_train
 
-        if self.model_name_experts == 'mrots':
-            lams = [1e-3, 1e-3, 1e-1, 1e-1]  # hyper-parameters for MROTS
-            self.MULTITASK = True
-            # same initiator for soft or hard for MROTS
-            if self.partial_fit_expert:
-                _warm_star = True
-                _n_iters = 1
-            else:
-                _warm_star = False
-                _n_iters = 20
+        X_train = preprocess_concatenate_X_datasets(data_sets, meta_per_dataset, data_type, current_idxs,
+                                                    current_nns, feature_list, preprocess_X, cell_types_dict,
+                                                    neighbor_type='Del', log=False, per_cell=per_cell,
+                                                    baseline=baseline, poly=False)
 
-            for i in range(self.n_classes_0):
-                for j in range(self.n_classes_1):
-                    self.model_experts[i][j] = mrots(lams, no_intercept=False, warm_start=_warm_star,
-                                                     sparse_omega=False, n_iters=_n_iters)
+        data_sets = datasets_test
+        meta_per_dataset = meta_per_dataset_test
+        current_idxs = idx_test_in_dataset
+        current_nns = neighbors_test
 
-        elif self.model_name_experts == 'lasso':
-            if self.soft:
-                raise NotImplementedError(f"Weighted learning not available for lasso for now.")
-            else:
-                if self.partial_fit_expert:
-                    _max_iter = 1
-                    _warm_start = True
-                else:
-                    _max_iter = 1000
-                    _warm_start = False
+        X_test = preprocess_concatenate_X_datasets(data_sets, meta_per_dataset, data_type, current_idxs,
+                                                   current_nns, feature_list, preprocess_X, cell_types_dict,
+                                                   neighbor_type='Del', log=False, per_cell=per_cell,
+                                                   baseline=baseline, poly=False)
 
-                for i in range(self.n_classes_0):
-                    for j in range(self.n_classes_1):
-                        _models = [Lasso(alpha=1e-5, precompute=True, max_iter=_max_iter,
-                                         warm_start=_warm_start, random_state=self.random_state,
-                                         selection='random') for i in range(self.num_responses)]
-                        self.model_experts[i][j] = _models
+        assert X_train.shape[0] == len(idx_train)
+        assert X_test.shape[0] == len(idx_test)
 
-        elif self.model_name_experts == 'linear':
-            # same initiator for soft or hard for Linear
-            if self.partial_fit_expert:
-                warnings.warn(f"Warining: partial fit for linear regression is same as complete fit when \
-                using all training samples to fit")
+        X_trains[feature_name] = X_train
+        X_tests[feature_name] = X_test
 
-            for i in range(self.n_classes_0):
-                for j in range(self.n_classes_1):
-                    _models = [LinearRegression() for i in range(self.num_responses)]
-                    self.model_experts[i][j] = _models
+    # filter features based on original scale
+    if top_k_regulator is not None:
+        # filter regulators neighbor
+        dispersion = X_trains['regulators_neighbor_self'].var(axis=0) / (
+                    X_trains['regulators_neighbor_self'].mean(axis=0) + 1e-6)
+        idx_filtered = np.argsort(-dispersion, axis=0)[:top_k_regulator]
+        for key in ['regulators_neighbor', 'regulators_neighbor_self']:
+            if X_trains[key] is not None:
+                X_trains[key] = X_trains[key][:, idx_filtered]
+                X_tests[key] = X_tests[key][:, idx_filtered]
+                regulator_list_neighbor = list(np.array(regulator_list_neighbor)[idx_filtered])
 
+        # filter regulators self
+        dispersion = X_trains['regulators_self'].var(axis=0) / (X_trains['regulators_self'].mean(axis=0) + 1e-6)
+        idx_filtered = np.argsort(-dispersion, axis=0)[:top_k_regulator]
+        X_trains['regulators_self'] = X_trains['regulators_self'][:, idx_filtered]
+        X_tests['regulators_self'] = X_tests['regulators_self'][:, idx_filtered]
+        regulator_list_self = list(np.array(regulator_list_self)[idx_filtered])
+
+        total_regulators = regulator_list_neighbor + regulator_list_self
+
+    # transform features: log + standardize
+    for i in range(0, len(feature_types)):
+        feature_type = feature_types[i]
+        feature_name = feature_type['name']
+
+        log = feature_type['log']
+        standardize = feature_type['standardize']
+        feature_poly = feature_type['poly']
+        print(
+            f"Now transform for feature: {feature_name} by polynomial: {feature_poly}, natural log: {log}, standardize(z-score): {standardize}")
+
+        X_train = X_trains[feature_name]
+        X_test = X_tests[feature_name]
+
+        if feature_poly:
+            # make the features polynomial (order = 2)
+            poly = PolynomialFeatures(2)
+            X_train = poly.fit_transform(X_train)
+            X_test = poly.fit_transform(X_test)
+
+        if log:
+            X_train = np.log1p(X_train)
+            X_test = np.log1p(X_test)
+
+        if standardize:
+            scaler = preprocessing.StandardScaler().fit(X_train)
+            X_train = scaler.transform(X_train)
+            if np.ndim(X_test) == np.ndim(X_train):
+                print(f"Test data standardized!")
+                X_test = scaler.transform(X_test)
+
+        X_trains[feature_name] = X_train
+        X_tests[feature_name] = X_test
+
+    return X_trains, X_tests, regulator_list_neighbor, regulator_list_self
+
+
+def preprocess_concatenate_X_datasets(data_sets, meta_per_dataset, data_type, current_idxs,
+                                      current_nns, feature_list, preprocess_X, cell_types_dict,
+                                      neighbor_type='Del', log=False, per_cell=True,
+                                      baseline=False, poly=True):
+    """
+    Integrate merFISH datasets for a given set of datasets. A wrapper function over the pre-
+    -processing functions of X of each dataset. Concatenate preprocessed datasets and transform.
+    For baseline covariates, add 1 more covariate: bregma.
+
+    Args:
+        data_sets: list of list of numpy arrays and dictionaries, in the format
+            [current_meta, gene_exp, current_cor]
+        log: boolean, if take transformation as log(x+1)
+        preprocess_X: function, helper function to process different features for each cell/dataset(baseline)
+
+    Return:
+        X: numpy.array, concatenated accross datasets
+
+    """
+
+    # for general covariates
+    X_all_list = []
+
+    ## for each dataset, loop through each cell
+    for i in range(len(data_sets)):
+        current_meta, meta_columns, current_cor, cor_columns, \
+        gene_exp, gene_exp_columns = data_sets[i]
+
+        current_idx = current_idxs[i]
+
+        if current_nns is not None:
+            current_nn = current_nns[i]
         else:
-            raise NotImplementedError(f"Now only support for mrots, lasso or linear.")
+            current_nn = None
 
-    @staticmethod
-    def train_gate(model, idx_subset, labels, X_train_clf, current_classes):
-        """
-
-        Train a single gate/classifier.
-
-        Args:
-            model: object from a model class
-            idx_subset: list of integers, indexes of samples that are assigned to this gate (and used for training)
-            labels: list of integers, labels of this subset of samples
-            X_train_clf: numpy array, sample size x feature size, features for the gate
-            current_classes: list of integers, unique labels of non-empty classes
-
-        Returns:
-            probs: numpy array, (total) sample size x number of classes, predicted probability of samples assigned \
-            to different classes
-            errors: float, cross-entropy error on this subset of training samples
-
-        """
-        # get subset data for training
-        _X = X_train_clf[idx_subset]
-
-        # number of samples in labels should be the same as the sub training data
-        assert _X.shape[0] == len(labels)
-
-        if len(current_classes) == 1:
-            probs = np.ones(X_train_clf.shape[0])
-            errors = 0
+        if meta_per_dataset is not None:
+            meta_dataset = meta_per_dataset[i]
         else:
-            model.fit(_X, labels)
-            # get predictions for all samples
-            probs = model.predict_proba(X_train_clf)
+            meta_dataset = None
 
-            # get errors for the subset of samples
-            y_hat_trained = model.predict_proba(_X)
-            errors = log_loss(labels, y_hat_trained, normalize=True)
+        if feature_list is not None:
+            _all_features = list(gene_exp_columns.keys())
+            feature_list_idx = [_all_features.index(f) for f in feature_list]
 
-            # make sure the class labels used by the classifier same as those in current_classes
-            assert all(current_classes == model.classes_)
+        if per_cell:
+            x_list = []
+            for i in range(0, len(current_idx)):
+                x_conv = preprocess_X(i, data_type, current_meta, meta_columns, current_cor,
+                                      cor_columns, gene_exp, gene_exp_columns, current_nn,
+                                      current_idx, feature_list_idx, cell_types_dict, "Del")
+                x_list.append(x_conv)
 
-        return probs, errors
+            _X = np.array(x_list)
 
-    @staticmethod
-    def train_expert(model, idx_subset, Y_train, X_train, weight, MultiTask=False):
-        """
+            assert any(np.isnan(_X).flatten()) is False
 
-        Train a single expert.
-
-        Args:
-            model: object or a list of objects (if MultiTask = false) from a model class
-            idx_subset: list of integers, indexes of samples that are assigned to this expert (and used for training)
-            Y_train: numpy array, sample size x number of responses, response variables
-            X_train: numpy array, sample size x feature size, features for experts
-            weight: numpy array, sample size x 1, sample weights for this expert
-            MultiTask: boolean, if the expert is multi-task
-
-        Returns:
-            Y_hat: numpy array, (total) sample size x number of responses, predictions from this expert
-            errors: float, (unweighted) mean square error on the assigned training samples
-
-        Raises:
-            TypeError: if the expert model does not support sample_weight keyword
-
-        """
-        # get subset data for training
-        _X = X_train[idx_subset, :]
-        _Y = Y_train[idx_subset, :]
-
-        if MultiTask:
-            model.fit(_X, _Y, sample_weight=weight)
-
-            # get prediction for all samples
-            Y_hat = model.predict(X_train)
-
-            # get errors for assigned samples
-            Y_hat_trained = model.predict(_X)
-            errors = (Y_hat_trained - _Y) ** 2
-
-        else:
-            errors = []
-            Y_hat = []
-
-            K = 1
-            # when response variable has dimension > 1
-            if _Y.ndim > 1:
-                K = _Y.shape[1]
-
-            # number of sub-models equal to number of responses
-            assert K == len(model)
-
-            # fit for each response y separately
-            for i in range(K):
-                # print(f"Currently training and testing gene: {response_list[i]}")
-                if _Y.ndim > 1:
-                    _y = _Y[:, i]
-                else:
-                    _y = _Y
-
-                sub_model = model[i]
-
-                try:
-                    sub_model.fit(_X, _y, sample_weight=weight)
-                except TypeError:
-                    sub_model.fit(_X, _y)
-
-                # get prediction for all samples
-                y_hat = sub_model.predict(X_train)
-
-                # get errors for assigned samples
-                y_hat_trained = sub_model.predict(_X)
-                error = (y_hat_trained - _y) ** 2
-
-                Y_hat.append(y_hat)
-                errors.append(error)
-
-            errors = np.array(errors).T
-            Y_hat = np.array(Y_hat).T
-
-        return Y_hat, errors
-
-    @staticmethod
-    def get_expert_probs(errors, dist_type=None):
-        """
-        Transform mean square error into a 'probability' form. (Not real probability)
-
-        Args:
-            errors: numpy array, sample size x number of experts, mean square errors
-            dist_type: string, type of distribution; default none
-
-        Returns:
-            errors_probs: umpy array, sample size x number of experts, transformed errors
-
-        """
-        if dist_type is None:
-            # assume variance = 1
-            errors_probs = np.exp(-0.5 * errors)
-
-        return errors_probs
-
-    @staticmethod
-    def get_joint_gate_probs(gate_probs_0, gate_probs_1):
-        """
-
-        Calculate the joint probability of classes across 2 levels (equal to the probability of experts).
-        That is: p(level 1 = i, level 2 = j| x) = p(expert = z | x)
-
-        Args:
-            gate_probs_0: numpy array, sample size x number of level 1 classes, level 1 gate outputs
-            gate_probs_1: list of numpy arrays, each containing an array of sample size x number of \
-            level 2 classes corresponding to the outputs from a level 2 gate
-
-        Return:
-            gate_probs: numpy array, sample size x number of experts
-        """
-
-        # if multiple classes exist for level 1
-        if gate_probs_0.ndim > 1:
-            # number of level 1 classes equal to the number of level 2 gates
-            assert gate_probs_0.shape[1] == len(gate_probs_1)
-            temp = []
-            for i in range(0, gate_probs_0.shape[1]):
-                # for the i_th level 1 class, the joint probability equals to
-                # p(level 1=i | x) * p(level 2 | level 1=i, x)
-                if gate_probs_1[i].ndim == 1:
-                    temp.append(gate_probs_0[:, i][:, None] * gate_probs_1[i][:, None])
-                else:
-                    temp.append(gate_probs_0[:, i][:, None] * gate_probs_1[i])
-
-            return np.concatenate(temp, axis=1)
-        else:
-            # in this case, gate_probs_0 only has dimension 1 and thus only 1 class for level 1
-            # and 1 gate for level 2
-            assert len(gate_probs_1) == 1
-
-            if gate_probs_1[0].ndim == 1:
-                return gate_probs_0[:, None] * gate_probs_1[0][:, None]
-            else:
-                return gate_probs_0[:, None] * gate_probs_1[0]
-
-    @staticmethod
-    def get_posterior_expectations(gate_probs, expert_probs, cur_iter,
-                                   iter_start_gate=0, normalize=True):
-        """
-
-        Calculate the posterior probability/weight of experts as the product of likelihood and expert probability.
-        That is: p(expert = z | x, y) = p(y | expert = z, x) * p(expert = z | x) / p(y | x)
-
-        Args:
-            gate_probs: numpy array, sample size x number of experts, joint probability of classes given features
-            expert_probs: numpy array, sample size x number of experts, sample likelihood of each expert
-            cur_iter: integer, current epoch
-            iter_start_gate: integer, before which use only expert likelihood to approximate the weight; default 0
-            normalize: boolean, if normalize by p(y | x) or not, default true
-
-        Returns:
-            posterior weights of experts (normalized or not), numpy array, sample size x number of experts
-
-        """
-
-        _block = np.ones_like(gate_probs)
-
-        # early learning for gates is not stable sometimes; thus use only likelihood
-        if cur_iter < iter_start_gate:
-            temp = np.multiply(_block, expert_probs)
-        else:
-            # temp = ((gate_probs + _block)/2)*expert_probs
-            temp = np.multiply(gate_probs, expert_probs)
-
-        if normalize:
-            # TBD: might be a better way than taking just 1e-50
-            # have tried sum-exp but it did not work for very small likelihood
-            expectations = temp / (temp.sum(axis=1) + 1e-50)[:, None]
-            return expectations
-        else:
-            return temp
-
-    @staticmethod
-    def map_classes_to_expert(current_classes):
-        """
-
-        Map classes at different levels with the index of experts (with index 0,1,2,...)
-        based on a set of available (non-empty) classes at different levels.
-
-        Args:
-            current_classes: list of list of integers, each sub-list corresponnds to a gate, containing unique labels \
-            of non-empty classes
-
-        Returns:
-            level_0_for_expert: list of integers, the class at level 1 for an expert
-            level_1_for_expert: list of integers, the class at level 2 for an expert
-
-        """
-        # map level 1 classes to each expert
-        _temp = [np.repeat(current_classes[0][i], len(current_classes[i + 1])).flatten()
-                 for i in range(len(current_classes[0]))]
-        level_0_for_expert = flatten(_temp)
-
-        # map level 2 classes to each expert
-        _temp = [current_classes[i + 1] for i in range(len(current_classes[0]))]
-        level_1_for_expert = flatten(_temp)
-
-        # both equal to the current number of experts
-        assert len(level_0_for_expert) == len(level_1_for_expert)
-
-        return level_0_for_expert, level_1_for_expert
-
-    def assign_labels(self, expectations, current_classes):
-        """
-
-        Re-assign labels for all levels of classes to samples based on estimated weights of experts.
-        Note this is different from the original algorithm in (Jordan & Jocab,1994) where they use
-        directly the weights to fit gates. Here we assume that the expert with highest weight (say expert j)
-        takes all probability mass (i.e. p(expert = j | y, x) = 1 and p(expert = others | y, x) = 0).
-        Then, for example, if (expert = 2) = (level 1 = 0, level 2 = 2); the class at level 2
-        for this sample is 2 and the class at level 1 for this sample is 0.  In this way,
-        we can fit gates with labels (thus hard classification).
-
-        Args:
-            expectations: numpy array, sample size x number of experts, weights of experts
-            current_classes: list of list of integers, each sub-list corresponnds to a gate, containing unique labels \
-            of non-empty classes
-
-        Returns:
-            labels_0: list of labels (0,1,..), N x 1, new labels based on learned expectations for level 1
-            labels_1: list of list of labels (0,1,..), each sub-list for each level 2 gate, \
-            new labels based on learned expectations for level 2
-
-        """
-        # get the largest weight for each sample
-        best_scores = expectations.max(axis=1)
-
-        # map classes to expert index
-        level_0_for_expert, level_1_for_expert = self.map_classes_to_expert(current_classes)
-
-        # get new level 1 labels
-        labels_0 = []
-
-        for i in range(expectations.shape[0]):
-            k = np.where(expectations[i, :] == best_scores[i])[0][0]
-            labels_0.append(level_0_for_expert[k])
-
-        labels_0 = np.array(labels_0)
-
-        # get new level 2 labels
-        # update the set of non-empty level 1 classes based on new level 1 assignments
-        current_classes_0 = [i for i in range(0, self.n_classes_0) if i in set(labels_0)]
-
-        labels_1 = []
-        for _c in current_classes_0:
-            idx_0 = np.where(labels_0 == _c)[0]
-            _labels_1 = []
-            for i in idx_0:
-                k = np.where(expectations[i, :] == best_scores[i])[0][0]
-                _labels_1.append(level_1_for_expert[k])
-            labels_1.append(np.array(_labels_1))
-
-        return labels_0, labels_1
-
-    def get_current_classes(self):
-        """
-
-        Update non-empty classes (in ascending order) for each layer, based on newly assigned labels inferred from the
-        posterior weights of experts.
-
-        Returns:
-            current_classes: list of list of integers, each sub-list corresponnds to a gate, containing unique labels \
-            of non-empty classes
-            n_experts: integer, number of experts based on available classes
-
-        """
-        current_classes = []
-        for l in range(len(self.labels_all)):
-            _labels = self.labels_all[l]
-            if l == 0:
-                _cur = [i for i in range(0, self.n_classes_0) if i in set(_labels)]
-            else:
-                _cur = [i for i in range(0, self.n_classes_1) if i in set(_labels)]
-
-            current_classes.append(_cur)
-
-        # number of level 1 classes equal to the number of gates at level 2
-        assert len(current_classes[0]) == len(current_classes[1:])
-
-        # get the number of terminal classes (available experts)
-        n_experts = len(flatten(current_classes[1:]))
-
-        return current_classes, n_experts
-
-    def map_sample_to_class(self, current_classes):
-        """
-
-        Map sample index to the classes they were assigned to at different levels.
-
-        Args:
-            current_classes: list of list of integers, each sub-list corresponnds to a gate, containing unique labels \
-            of non-empty classes
-
-        Returns:
-            idx_0: list of list of integers, each sub-list corresponds to the samples assigned to a class at level 1
-            idx_1: list of list of integers, each sub-list corresponds to the samples assigned to a class at level 2
-
-        """
-
-        # update idx of samples belonging to different classes
-        idx_0 = []
-        idx_1 = []
-        for i in range(len(current_classes[0])):
-            _c = current_classes[0][i]
-            _idx_0 = np.where(self.labels_0 == _c)[0]
-            idx_0.append(_idx_0)
-            # print(f"1st level labels length: {len(_idx_0)}")
-
-            _labels = self.labels_1[i]
-            _count = 0
-            for j in range(len(current_classes[i + 1])):
-                _c = current_classes[i + 1][j]
-                _idx_in_subset = np.where(_labels == _c)[0]
-                _idx_in_all = _idx_0[_idx_in_subset]
-                idx_1.append(_idx_in_all)
-
-                # print(f"2nd level labels length: {len(_idx_in_all)}")
-                _count += len(_idx_in_all)
-
-            # total number assigned to sub-level should equal to upper level
-            assert _count == len(_idx_0)
-
-        return idx_0, idx_1
-
-    def train(self, X_train, X_train_clf_1, X_train_clf_2, Y_train):
-        """
-        Train gates and experts based on EM.
-
-        Args:
-            X_train: numpy array, sample size x feature size, features for experts
-            X_train_clf_1: numpy array, sample size x feature size, features for the 1st layer gate
-            X_train_clf_2: numpy array, sample size x feature size, features for the 2nd layer gates
-            Y_train: numpy array, sample size x number of responses, response variables
-
-        Raises:
-            NotImplementedError: some experts or gates models are not supported
-
-        """
-
-        # ------ setting parameters ------
-        N = Y_train.shape[0]
-        best_overall_score = 1e9
-        best_epoch = 0
-        stop_flag = False
-
-        # input has same number response variables as initialized
-        assert Y_train.shape[1] == self.num_responses
-
-        # initialize labels at level 1
-        if self.init_labels_0 is None:
-            # if labels not given; initialize randomly
-            rng = np.random.RandomState(self.random_state)
-            self.labels_0 = rng.choice(self.n_classes_0, N, replace=True)
-        else:
-            self.labels_0 = self.init_labels_0
-
-        idx_0 = []
-        self.labels_1 = []
-
-        # initialize labels at level 2
-        for _c in range(0, self.n_classes_0):
-            _idx = np.where(self.labels_0 == _c)[0]
-            idx_0.append(_idx)
-
-            if self.init_labels_1 is None:
-                # if labels not given; initialize randomly
-                rng = np.random.RandomState(self.random_state)
-                _labels = rng.choice(self.n_classes_1, len(_idx), replace=True)
-            else:
-                _labels = self.init_labels_1[_c]
-            self.labels_1.append(_labels)
-
-        self.labels_all = [self.labels_0] + self.labels_1
-
-        # update non-empty classes (ascending order) for each layer
-        current_classes, self.n_experts = self.get_current_classes()
-
-        # update idx of samples belonging to different classes
-        idx_0, idx_1 = self.map_sample_to_class(current_classes)
-
-        # initialize weight vectors for each expert based on the initialized labels (hard grouping)
-        if self.soft:
-            self.weights = np.zeros([N, self.n_experts])
-
-            for _c in range(self.n_experts):
-                self.weights[idx_1[_c], _c] = 1
-
-            assert self.weights.sum(axis=0).sum() == N  # if each sample has been assigned to an expert
-            assert np.all(self.weights.sum(axis=1) < 2)  # if each sample has been assigned to an single expert
-
-        for epoch in range(0, self.n_epochs):
-
-            # maximization of gates/classifiers
-            # level 1 (1 single gate)
-            model = self.model_gates[-1]
-            idx_subset = np.arange(0, N)
-            labels = self.labels_0
-            _class = current_classes[0]
-
-            # print(f"level 1 gate assigned labels length: {len(idx_subset)}")
-            probs_0, errors_level_0 = self.train_gate(model, idx_subset, labels,
-                                                      X_train_clf_1, _class)
-
-            # level 2
-            probs_1 = []
-            errors_level_1 = []
-
-            # train each level 2 gate one-by-one
-            for i in range(len(current_classes[0])):
-                _c = current_classes[0][i]  # get the class at level 1
-                model = self.model_gates[_c]
-                idx_subset = idx_0[i]
-                labels = self.labels_1[i]
-                _class = current_classes[i + 1]
-
-                # print(f"level 2 gate assigned labels length: {len(idx_subset)}")
-                _probs, _errors = self.train_gate(model, idx_subset, labels,
-                                                  X_train_clf_2, _class)
-                probs_1.append(_probs)
-                errors_level_1.append(_errors)
-
-            # maximization of experts
-            errors_experts = []
-            errors_for_all = []
-            likelihood_for_all = []
-
-            # train each expert one-by-one
-            i = 0  # index for expert
-            for j in current_classes[0]:  # level 1
-                c0 = current_classes[0][j]
-                for c1 in current_classes[j + 1]:  # level 2
-                    if self.soft:
-                        idx_subset = np.arange(0, N)  # use full-set of training samples
-                        weight = self.weights[:, i]
-                    else:
-                        idx_subset = idx_1[i]  # use subset of training samples
-                        weight = np.ones(len(idx_subset))  # set weight all being 1
-
-                    model = self.model_experts[c0][c1]
-                    Y_hat, errors = self.train_expert(model, idx_subset, Y_train,
-                                                      X_train, weight, MultiTask=self.MULTITASK)
-
-                    # weighting the errors from this expert
-                    errors_experts.append(np.sum(weight[:, None].T @ errors))
-
-                    if self.GROUP_BY_LIKELIHOOD:
-                        # use assumed distribution (here multivariate Gaussian) for posterior probability
-                        if self.model_name_experts == 'mrots':
-                            # calculate likelihood with multivaraite Gaussian assumming dependence among responses
-                            _likelihood = model.get_likelihood(Y_hat, Y_train, self.num_responses,
-                                                               self.idx_conditioned, conditional=self.conditional)
-
-                        elif self.model_name_experts == 'lasso' or self.model_name_experts == 'linear':
-                            # calculate likelihood with multivaraite Gaussian assumming independence among responses
-                            _sample_var = np.sum((Y_hat - Y_train) ** 2, axis=0) / np.array(Y_hat.shape[0] - 1)
-                            _cov = np.diag(_sample_var)
-                            _cov_i = np.diag(1 / _sample_var)
-                            _likelihood = get_multigaussian_pdf(Y_hat, _cov, _cov_i, Y_train.shape[1], Y_train)
-
-                        else:
-                            raise NotImplementedError(f"Now only support for mrots, lasso or linear.")
-
-                        likelihood_for_all.append(_likelihood)
-
-                    else:
-                        # grouped based on average MSE (MSE for each data point, average over all response variables)
-                        try:
-                            mse = ((Y_hat - Y_train) ** 2).mean(axis=1)
-                        except IndexError:
-                            # a single response variable
-                            mse = ((Y_hat - Y_train) ** 2)
-
-                        errors_for_all.append(mse)
-
-                    i += 1
-
-            # calculate scores based on errors
-            _score = errors_level_0 + sum(errors_level_1) + sum(errors_experts)
-
-            if self.GROUP_BY_LIKELIHOOD:
-                expert_probs = np.array(likelihood_for_all).T
-            else:
-                # transform MSE into a 'probability' like form
-                errors_for_all = np.array(errors_for_all).T
-                expert_probs = self.get_expert_probs(errors_for_all, dist_type=None)
-
-            # calculate posterior probability/weights of experts
-            gate_probs = self.get_joint_gate_probs(probs_0, probs_1)  # get joint probability of classes given features
-            expectations = self.get_posterior_expectations(gate_probs, expert_probs, epoch,
-                                                           normalize=True)
-            if not np.allclose(expectations.sum(axis=1), 1):
-                warnings.warn(f"experts weights not sum to 1 for some samples!")
-
-            # update the posterior probability
-            if self.soft:
-                self.weights = expectations
-
-            # re-assign labels based on the new posterior probability
-            self.labels_0, self.labels_1 = self.assign_labels(expectations, current_classes)
-            self.labels_all = [self.labels_0] + self.labels_1
-
-            # update non-empty classes (ascending order) for each layer
-            current_classes, self.n_experts = self.get_current_classes()
-
-            # update idx of samples belonging to different classes
-            idx_0, idx_1 = self.map_sample_to_class(current_classes)
-
-            # early stopping (either label or score does not further change)
-            # NOTE: here stopping is based on training set;
-            print(f"------ epoch {epoch + 1} ------")
-            print(f"Best score: {best_overall_score}")
-            print(f"Current score: {_score}")
-            print(f"level 1 gate error: {errors_level_0}")
-            print(f"level 2 gate error: {errors_level_1}")
-            print(f"experts error: {errors_experts}")
-
-            if best_overall_score > _score:
-                best_overall_score, best_epoch = _score, epoch
-
-            if epoch > best_epoch + self.tolerance:
-                stop_flag = True
-
-            if stop_flag:
-                break
-
-        print(f"{epoch + 1} epochs in total")
-
-    def predict(self, X_test, X_test_clf_1, X_test_clf_2):
-
-        """
-        Make predictions on test data.
-
-        Args:
-            X_test: numpy array, sample size x feature size, features for experts
-            X_test_clf_1: numpy array, sample size x feature size, features for the 1st layer gate
-            X_test_clf_2: numpy array, sample size x feature size, features for the 2nd layer gates
-
-        Returns:
-            Y_hat_final: numpy array, sample size x number of responses, predictions
-
-        Raises:
-            NotImplementedError: some experts or gates models are not supported
-
-        """
-        # ------ setting parameters ------
-        N = X_test.shape[0]
-
-        # update non-empty classes (ascending order) for each layer
-        current_classes, self.n_experts = self.get_current_classes()
-
-        # map classes to expert index
-        level_0_for_expert, level_1_for_expert = self.map_classes_to_expert(current_classes)
-        level_0_for_expert, level_1_for_expert = np.array(level_0_for_expert), np.array(level_1_for_expert)
-
-        # get predictions from level 1 gates
-        model = self.model_gates[-1]
-        _class = current_classes[0]
-
-        if len(_class) != 1:
-            labels_0_pred = model.predict(X_test_clf_1)
-            probs_0 = model.predict_proba(X_test_clf_1)
-        else:
-            labels_0_pred = np.repeat(_class[0], X_test_clf_1.shape[0])
-            probs_0 = np.repeat(1, X_test_clf_1.shape[0])
-
-        # get predictions from level 2 gates
-        labels_1_pred_all = []
-        probs_1 = []
-
-        for i in range(len(current_classes[0])):
-            _c = current_classes[0][i]  # get the class at level 1
-            model = self.model_gates[_c]
-            _class = current_classes[i + 1]
-
-            if len(_class) != 1:
-                _prob = model.predict_proba(X_test_clf_2)
-                _pred = model.predict(X_test_clf_2)
-            else:
-                _prob = np.repeat(1, X_test_clf_2.shape[0])
-                _pred = np.repeat(_class, X_test_clf_2.shape[0])
-
-            labels_1_pred_all.append(_pred)
-            probs_1.append(_prob)
-
-        # get joint classes probability (expert probability)
-        if self.soft:
-            self.probs_expert = self.get_joint_gate_probs(probs_0, probs_1)
-
-        # get expert index for each sample
-        self.idx_expert = []
-        for n in range(X_test.shape[0]):
-            _idx = np.where(np.logical_and(level_0_for_expert == labels_0_pred[n],
-                                           level_1_for_expert ==
-                                           labels_1_pred_all[current_classes[0].index(labels_0_pred[n])][n]))[0][0]
-            self.idx_expert.append(_idx)
-
-        # get predictions from experts
-        Y_hat_all = []
-        i = 0  # index for expert
-        for j in current_classes[0]:  # level 1
-            c0 = current_classes[0][j]
-            for c1 in current_classes[j + 1]:  # level 2
-                model = self.model_experts[c0][c1]
-                if self.MULTITASK:
-                    Y_hat = model.predict(X_test)
-                elif self.model_name_experts == 'lasso' or self.model_name_experts == 'linear':
-                    # number of sub-models equal to number of responses
-                    assert self.num_responses == len(model)
-
-                    Y_hat = []
-
-                    # get for each response y separately
-                    for k in range(self.num_responses):
-                        sub_model = model[k]
-                        y_hat = sub_model.predict(X_test)
-                        Y_hat.append(y_hat)
-
-                    Y_hat = np.array(Y_hat).T
-                else:
-                    raise NotImplementedError(f"Now only support for mrots, lasso or linear.")
-
-                Y_hat_all.append(Y_hat)
-                i += 1
-
-        # get weighted average based on the predictions from experts and gates
-        if self.soft:
-            # get the weighted average prediction
-            Y_hat_final = np.zeros(Y_hat.shape)
-
-            # apply weight for each experts' output and get the summation
-            # TBD: change to einsum
-            for i in range(self.n_experts):
-                if self.probs_expert.ndim == 1:
-                    Y_hat_final += np.diag(self.probs_expert) @ Y_hat_all[i]
-                else:
-                    Y_hat_final += np.diag(self.probs_expert[:, i]) @ Y_hat_all[i]
+            X_all_list.append(_X)
 
         else:
-            # choose the best from all experts' output
-            Y_hat_final = []
-            for n in range(X_test.shape[0]):
-                _idx = self.idx_expert[n]
-                Y_hat_final.append(Y_hat_all[_idx][n])
+            _X = preprocess_X(data_type, current_meta, meta_columns, current_cor,
+                              cor_columns, gene_exp, gene_exp_columns, current_nn,
+                              current_idx, cell_types_dict, nn_type='Del', poly=poly)
 
-        Y_hat_final = np.array(Y_hat_final)
+            assert any(np.isnan(_X).flatten()) is False
 
-        return Y_hat_final
+            if baseline and data_type == 'merfish':
+                # for baseline covariates: for each dataset, generate baseline covariates
+                _, bregma = meta_dataset[0], float(meta_dataset[1])
+                # treat bregma as continuous
+                _feature_bregma = np.repeat(bregma, _X.shape[0])
+                _X = np.concatenate([_feature_bregma[:, None], _X], axis=1)
+
+            X_all_list.append(_X)
+
+    # concatenate
+    if len(X_all_list) > 0:
+        X_all = np.concatenate(X_all_list, axis=0)
+    else:
+        X_all = np.array(X_all_list)
+
+    del X_all_list
+
+    # transformation; Not used for now
+    #     if log:
+    #         return np.log1p(X_all)
+    #     else:
+    return X_all
+    
+    
+def preprocess_X_neighbor_by_type_per_cell(i, data_type, current_meta, meta_columns, current_cor, 
+                                       cor_columns, gene_exp, gene_exp_columns, current_nn,
+                                       current_idx, feature_list_idx, cell_types_dict,nn_type = 'Del'): 
+    """
+    Get neighboring expression as features for a single cell; sum the expression from different cell types separately.
+    (not used currently)
+
+    Args:
+        i: integer, index of a cell in the current dataset
+        data_type: string, merfish/starmap/merfish_cell_line
+        current_meta: numpy array, meta info for the current dataset
+        meta_columns: dictionary, use column name as key for column index
+        current_cor: numpy array, spatial coordimates for the current dataset
+        cor_columns: dictionary, use column name (e.g. cor_x, cor_y) as key for column index
+        gene_exp: numpy array, gene expression for the current dataset
+        gene_exp_columns: dictionary, use column name (gene names) as key for column index
+        current_nn: numpy array, neighbors for cells in current dataset
+        current_idx: list, index regarding the current dataset
+        feature_list_idx: list of integers, index of the ligand to be used as neighboring features
+        cell_types_dict: dictionary, cell type as key and 0 as value; include all available cell types
+        nn_type: string, type of neighbors, Del(Delaunay) or k-nn
+
+    """
+
+    idx_in_full = current_idx[i]
+    _nn = current_nn[idx_in_full]
+    
+    if data_type == "seqfish":
+        # seqfish's neighborhood defined only within FOV 
+        fov = current_cor['Field of View'][idx_in_full]
+        sub_gene_exp = gene_exp.loc[current_cor['Field of View'] == fov,:].copy()
+        sub_gene_exp.reset_index(inplace=True, drop=True)
+    else:
+        # merfish's neighborhood defined over all cells 
+        sub_gene_exp = gene_exp
+
+    if nn_type == 'Del':
+        nb_genes = sub_gene_exp[_nn,:]
+    elif nn_type == 'k-nn':
+        nb_genes = sub_gene_exp[_nn == 1]
+    else:
+        print ('Please specify neighborhood type')
+
+    sub = current_meta[_nn, meta_columns['Cell_class']]
+
+    nb_genes_fil = nb_genes[:, feature_list_idx]
+
+    temp = cell_types_dict.copy()
+    keys = temp.keys
+    keys = list(temp.keys())
+
+    _per_type = np.zeros([len(temp),len(feature_list_idx)])
+
+    for cur_type in set(sub):
+        _per_type[keys.index(cur_type),:] = np.sum(nb_genes_fil[np.where(sub == cur_type)[0],:], axis=0)
+
+    _per_type = _per_type.reshape(-1)
+
+    del nb_genes
+    del sub
+    del nb_genes_fil
+        
+    return _per_type
 
 
 
+def preprocess_X_neighbor_per_cell(i, data_type, current_meta, meta_columns, current_cor, 
+                                cor_columns, gene_exp, gene_exp_columns, current_nn,
+                                current_idx, feature_list_idx, cell_types_dict,nn_type = 'Del'):
+    """
+     Get neighboring expression as features for a single cell; sum the expression from different cell jointly.
+
+     Args:
+         i: integer, index of a cell in the current dataset
+         data_type: string, merfish/starmap/merfish_cell_line
+         current_meta: numpy array, meta info for the current dataset
+         meta_columns: dictionary, use column name as key for column index
+         current_cor: numpy array, spatial coordimates for the current dataset
+         cor_columns: dictionary, use column name (e.g. cor_x, cor_y) as key for column index
+         gene_exp: numpy array, gene expression for the current dataset
+         gene_exp_columns: dictionary, use column name (gene names) as key for column index
+         current_nn: numpy array, neighbors for cells in current dataset
+         current_idx: list, index regarding the current dataset
+         feature_list_idx: list of integers, index of the ligand to be used as neighboring features
+         cell_types_dict: dictionary, cell type as key and 0 as value; include all available cell types
+         nn_type: string, type of neighbors, Del(Delaunay) or k-nn
+
+     """
+        
+    idx_in_full = current_idx[i]
+    _nn = current_nn[idx_in_full]
+    
+    if data_type == "seqfish":
+        # seqfish's neighborhood defined only within FOV 
+        fov = current_cor['Field of View'][idx_in_full]
+        sub_gene_exp = gene_exp.loc[current_cor['Field of View'] == fov,:].copy()
+        sub_gene_exp.reset_index(inplace=True, drop=True)
+    else:
+        # merfish's neighborhood defined over all cells 
+        sub_gene_exp = gene_exp
+
+    if nn_type == 'Del':
+        nb_genes = sub_gene_exp[_nn,:]
+    elif nn_type == 'k-nn':
+        nb_genes = sub_gene_exp[_nn == 1]
+    else:
+        print ('Please specify neighborhood type')
+
+    nb_genes_fil = nb_genes[:, feature_list_idx]
+    
+    # choose a convlution method 
+    # x_conv = np.log2(nb_genes_fil + 1).sum()
+    x_conv = np.sum(nb_genes_fil, axis = 0)
+    
+    del nb_genes_fil
+        
+    return x_conv 
+
+def preprocess_X_self_per_cell(i, data_type, current_meta, meta_columns, current_cor, 
+                                cor_columns, gene_exp, gene_exp_columns, current_nn,
+                                current_idx, feature_list_idx, cell_types_dict,nn_type = 'Del'):
+    """
+     Get cell's own expression as features for a single cell.
+     Args:
+         i: integer, index of a cell in the current dataset
+         data_type: string, merfish/starmap/merfish_cell_line
+         current_meta: numpy array, meta info for the current dataset
+         meta_columns: dictionary, use column name as key for column index
+         current_cor: numpy array, spatial coordimates for the current dataset
+         cor_columns: dictionary, use column name (e.g. cor_x, cor_y) as key for column index
+         gene_exp: numpy array, gene expression for the current dataset
+         gene_exp_columns: dictionary, use column name (gene names) as key for column index
+         current_nn: numpy array, neighbors for cells in current dataset
+         current_idx: list, index regarding the current dataset
+         feature_list_idx: list of integers, index of the ligand to be used as neighboring features
+         cell_types_dict: dictionary, cell type as key and 0 as value; include all available cell types
+         nn_type: string, type of neighbors, Del(Delaunay) or k-nn
+
+     """
+
+    idx_in_full = current_idx[i]
+    x_self = gene_exp[idx_in_full, feature_list_idx]
+        
+    return x_self
+
+
+
+
+def preprocess_X_neighbor_type_per_dataset(data_type, current_meta, meta_columns, current_cor, 
+                                       cor_columns, gene_exp, gene_exp_columns, current_nn,
+                                       current_idx, cell_types_dict, nn_type = 'Del', poly = True):
+    """
+     Get cell's neighboring cell types for a single cell.
+
+     Args:
+         i: integer, index of a cell in the current dataset
+         data_type: string, merfish/starmap/merfish_cell_line
+         current_meta: numpy array, meta info for the current dataset
+         meta_columns: dictionary, use column name as key for column index
+         current_cor: numpy array, spatial coordimates for the current dataset
+         cor_columns: dictionary, use column name (e.g. cor_x, cor_y) as key for column index
+         gene_exp: numpy array, gene expression for the current dataset
+         gene_exp_columns: dictionary, use column name (gene names) as key for column index
+         current_nn: numpy array, neighbors for cells in current dataset
+         current_idx: list, index regarding the current dataset
+         feature_list_idx: list of integers, index of the ligand to be used as neighboring features
+         cell_types_dict: dictionary, cell type as key and 0 as value; include all available cell types
+         nn_type: string, type of neighbors, Del(Delaunay) or k-nn
+
+     """
+
+    x_list = []
+    for i in range(0,len(current_idx)):
+        idx_in_full = current_idx[i]
+        _nn = current_nn[idx_in_full]
+        sub= current_meta[_nn,:]
+        # not count in cell with 'NaN' in their cell class 
+        cell_types_raw = sub[:, meta_columns['Cell_class']]
+        cell_types_valid = cell_types_raw[~pd.isnull(cell_types_raw)]
+        unique, counts = np.unique(cell_types_valid, return_counts=True)
+        x_conv = dict(zip(unique, counts))
+        temp = cell_types_dict.copy()
+        for key, value in temp.items():
+            if key in x_conv:
+                temp[key] = x_conv[key]
+        x_list.append(list(temp.values()))
+
+    X_n_type = np.array(x_list)
+
+    del x_list
+    
+    return X_n_type
+
+def preprocess_X_baseline_per_dataset(data_type, current_meta, meta_columns, current_cor, 
+                                       cor_columns, gene_exp, gene_exp_columns, current_nn,
+                                       current_idx, cell_types_dict, nn_type = 'Del', poly = False):
+    """
+     Get cell's baselines (spatial coordinates) as features for a single cell.
+
+     Args:
+         i: integer, index of a cell in the current dataset
+         data_type: string, merfish/starmap/merfish_cell_line
+         current_meta: numpy array, meta info for the current dataset
+         meta_columns: dictionary, use column name as key for column index
+         current_cor: numpy array, spatial coordimates for the current dataset
+         cor_columns: dictionary, use column name (e.g. cor_x, cor_y) as key for column index
+         gene_exp: numpy array, gene expression for the current dataset
+         gene_exp_columns: dictionary, use column name (gene names) as key for column index
+         current_nn: numpy array, neighbors for cells in current dataset
+         current_idx: list, index regarding the current dataset
+         feature_list_idx: list of integers, index of the ligand to be used as neighboring features
+         cell_types_dict: dictionary, cell type as key and 0 as value; include all available cell types
+         nn_type: string, type of neighbors, Del(Delaunay) or k-nn
+
+     """
+   
+
+    # prepare baseline features 
+    if data_type == 'seqfish':
+        # for the categories not present, fill them all 0
+        dummies = pd.get_dummies(current_meta['Cell_class'][current_idx], prefix='', prefix_sep='')
+        full_cell_types = list(cell_types_dict.keys())
+        cell_type_one_hot  = dummies.T.reindex(full_cell_types).T.fillna(0)
+        cell_type_one_hot.reset_index(inplace=True, drop=True)
+        cor_sub = current_cor[['X','Y']].iloc[current_idx,:]
+        cor_sub.reset_index(inplace=True, drop=True)
+        X = pd.concat([cor_sub,cell_type_one_hot],axis=1)
+    elif 'merfish' in data_type or data_type == 'starmap':
+        if current_meta is not None: 
+            full_cell_types = list(cell_types_dict.keys())
+            # for the categories not present, fill them all 0
+            dummies = pd.get_dummies(current_meta[current_idx,meta_columns['Cell_class']], prefix='', prefix_sep='')
+            cell_type_one_hot = dummies.T.reindex(full_cell_types).T.fillna(0)
+            cell_type_one_hot.reset_index(inplace=True, drop=True)
+            cell_type_one_hot = cell_type_one_hot .to_numpy()
+        if current_cor is not None:
+            cor_sub = current_cor[current_idx,:]
+            
+        if current_meta is not None and current_cor is not None:
+            X = np.concatenate([cor_sub, cell_type_one_hot],axis=1)
+            del cell_type_one_hot
+            del dummies
+            del cor_sub
+    
+        elif current_meta is not None:
+            X = cell_type_one_hot
+        elif current_cor is not None:
+             X = cor_sub
+        else:
+            raise TypeError("Both cell type info and coordinates info NOT available! No baselie featues "
+                            "should be generated")
+            return None
+    else:
+        raise NotImplementedError (f"Only support merfish/starmap/mefish_cell_line")
+
+        return None
+    
+    if poly:
+        # make the features polynomial (order = 2)
+        poly = PolynomialFeatures(2)
+        X = poly.fit_transform(X)
+        
+    
+    return X
+
+
+# --- process Y 
+
+
+def prepare_responses(data_type, datasets_train, datasets_test, idx_train_in_general, idx_test_in_general,
+                      idx_train_in_dataset, idx_test_in_dataset, neighbors_train, neighbors_test,
+                      response_type, log_response, response_list_prior, top_k_response,
+                      genes_filtered, l_u, r_u):
+    """
+
+    Generate response variables.
+
+    Args:
+        data_type: string, merfish/starmap/merfish_cell_line
+        datasets_train: list of numpy arrays & dictionaries; all info for training samples;in the format
+           [current_meta, gene_exp, current_cor]
+        datasets_test: list of numpy arrays & dictionaries; all info for testing samples;in the format
+           [current_meta, gene_exp, current_cor]
+        idx_train_in_general:list, index of training cells in the general (all cell types) list
+        idx_test_in_general:list, index of testing cells in the general (all cell types) list
+        idx_train_in_dataset: list of list of index of training cells in each dataset (as grouped by animal & bregma)
+        idx_test_in_dataset: list of list of index of testing cells in each dataset (as grouped by animal & bregma)
+        neighbors_train: list of numpy arrays, neighboring info for the training samples
+        neighbors_test: list of numpy arrays, neighboring info for the testing samples
+        response_type: string, if use raw expression value as response ('original')
+        log_response: boolean, if use log transformed expression values for response
+        response_list_prior: list of strings, list of responses genes from prior
+        top_k_response: integer, top K response genes to be used as response; they will be sorted \
+        according to dispersion (descending); default None
+        genes_filtered: list of strings, all genes profiled in the expression data; all letters are in uppercase
+        l_u: list of strings, ligands from the database; all letters are in uppercase
+        r_u: list of strings, receptors from the database; all letters are in uppercase
+
+       Returns:
+           Y_train: numpy array, sample size x number of responses, processed values (can still be same as _true if \
+           response_type = 'original')
+           Y_train_true: numpy array, sample size x number of responses, raw values
+           Y_test: numpy array, sample size x number of responses, processed values (can still be same as _true if \
+           response_type = 'original')
+           Y_test_true: numpy array, sample size x number of responses, raw values
+           response_list: list of strings, names of genes used for responses
+
+       """
+
+    if response_list_prior is not None:
+        feature_list = response_list_prior
+        response_list = feature_list
+    else:
+        feature_list = [g for g in genes_filtered if g not in l_u.union(r_u)]
+        # feature_list = genes_filtered
+        response_list = feature_list
+
+    response_type = response_type
+    log_response = log_response
+    print(f"Response type: {response_type}; transformby natural log: {log_response}")
+    bins = [-1e10, -0.3, 0.3, 1e10]
+
+    data_sets = datasets_train
+    current_idxs = idx_train_in_dataset
+    current_nns = neighbors_train
+    current_idx_in_general = idx_train_in_general
+    baseline_file = None
+    # baseline_file = f"output/baseline/{data_type}/general/{preprocess}/{test_animal}/Y_pred_train_{behavior}_{sex}.npy"
+
+    Y_train, Y_train_true, transformer = preprocess_Y_datasets(data_sets, data_type, current_idxs,
+                                                               current_idx_in_general,
+                                                               feature_list, bins, response_type,
+                                                               baseline_file=baseline_file, log=False, transformer=None,
+                                                               scale=False)
+
+    data_sets = datasets_test
+    current_idxs = idx_test_in_dataset
+    current_nns = neighbors_test
+    current_idx_in_general = idx_test_in_general
+    baseline_file = None
+    # baseline_file = f"output/baseline/{data_type}/general/{preprocess}/{test_animal}/Y_pred_test_{behavior}_{sex}.npy"
+
+    Y_test, Y_test_true, _ = preprocess_Y_datasets(data_sets, data_type, current_idxs, current_idx_in_general,
+                                                   feature_list, bins, response_type, baseline_file=baseline_file,
+                                                   log=False, transformer=transformer, scale=False)
+
+    # filter response genes
+    if top_k_response is not None:
+        dispersion = Y_train.var(axis=0) / (Y_train.mean(axis=0) + 1e-6)
+
+        idx_filtered = np.argsort(-dispersion, axis=0)[:top_k_response]
+        Y_train = Y_train[:, idx_filtered]
+        Y_train_true = Y_train_true[:, idx_filtered]
+        if np.ndim(Y_test) > 1:
+            Y_test = Y_test[:, idx_filtered]
+            Y_test_true = Y_test_true[:, idx_filtered]
+        response_list = list(np.array(response_list)[idx_filtered])
+
+    if log_response:
+        Y_train = np.log1p(Y_train)
+        Y_test = np.log1p(Y_test)
+
+    return Y_train, Y_train_true, Y_test, Y_test_true, response_list
+
+
+def preprocess_Y_datasets(data_sets, data_type, current_idxs, current_idx_in_general,
+                          feature_list, bins, response_type, baseline_file=None, log=False, transformer=None,
+                          scale=False):
+    """
+
+    Preprocess for response variables Y for a data sets. The dataset contains info for a single animal's bregma.
+
+    Args:
+        data_sets: list of list of numpy arrays and dictionaries, in the format [current_meta, gene_exp, current_cor]
+        response_type: string, one of ['original', 'residual', 'residual_category']
+        current_idxs: list of list of index of cells in each dataset
+        current_idx_in_general: list, sub-group index in all datasets(all animals/FOVs)
+    Return:
+        Y_processed: numpy array, processed response variables
+        Y_true: numpy array, original values
+        transformer: None or a StandardScaler object
+
+    """
+
+    # Prepare the true/original Y
+    Y_true_all = []
+
+    for i in range(len(data_sets)):
+        current_meta, meta_columns, current_cor, cor_columns, \
+        gene_exp, gene_exp_columns = data_sets[i]
+        current_idx = current_idxs[i]
+
+        # Prepare the true: subset the true value
+        Y_true = gene_exp[current_idx, :].copy()
+        Y_true_all.append(Y_true)
+
+    # concatenate the original Y for all datasets
+    if len(Y_true_all) == 1:
+        Y_true = Y_true_all[0]
+    elif len(Y_true_all) == 0:
+        Y_true = np.array([])
+    else:
+        Y_true = np.concatenate(Y_true_all, axis=0)
+
+    # Prepare the true: take the log
+    if log:
+        Y_true = np.log1p(Y_true)
+
+        # Prepare the true: scale the true
+    if scale:
+        # scaling is done for ALL datasets together!
+        if transformer is None:
+            # Given that the baseline scaler is fit over entire train data,
+            # should apply to the entire train data here as well
+            transformer = preprocessing.StandardScaler().fit(gene_exp)
+            Y_true = transformer.transform(Y_true)
+            print('Scaled using new transformer on gene_exp!')
+        else:
+            Y_true = transformer.transform(Y_true)
+            print('Scaled using old transformer!')
+
+            # get subset for feature list
+    if feature_list is not None and len(Y_true_all) > 0:
+        _all_features = list(gene_exp_columns.keys())
+        feature_list_idx = [_all_features.index(f) for f in feature_list]
+
+    if response_type == 'original':
+        if len(Y_true_all) > 0:
+            return Y_true[:, feature_list_idx], Y_true[:, feature_list_idx], transformer
+        else:
+            return Y_true, Y_true, transformer
+
+    elif baseline_file is not None:
+
+        Y_pred_baseline = np.load(f"{baseline_file}")
+
+        # subset the prediction
+        if current_idx_in_general is not None:
+            Y_pred_baseline_sub = Y_pred_baseline.T[current_idx_in_general, :]
+        else:
+            print('Current_idx_in_general is None!')
+
+        #         if log: # already taken log before fitting; no need
+        #             Y_pred_baseline_sub = np.log1p(Y_pred_baseline_sub)
+
+        Y_dif = Y_true[:, feature_list_idx] - Y_pred_baseline_sub
+
+        if response_type == 'residual':
+            return Y_dif, Y_true[:, feature_list_idx], transformer
+        else:  # TBD
+            temp = Y_dif[feature_list].apply(lambda x: pd.cut(x, bins, labels=[0, 1, 2]), axis=1)
+            return temp, transformer
+    else:
+
+        print("Please provide the filename of the baseline prediction.")
+        return '_', '_', '_'
+
+
+# --- filter
+
+flatten = lambda l: [item for sublist in l for item in sublist]
+
+def filter_by_response(Y_processed, Y_true, criterion = 'non-zero'):
+    """
+
+    Args:
+        Y_processed: numpy array, processed response variables
+        Y_true: numpy rray, original values
+
+    Returns:
+        idx_per_response: list of list of indexes of each response variable; order as in Y_true
+
+    """
+    
+    idx_per_response = []
+    for i in range(0,Y_true.shape[1]):
+        
+        if criterion == 'non-zero':
+            _idx = np.where(Y_true[:,i] != 0)[0]
+        
+        idx_per_response.append(_idx)
+    
+    return idx_per_response
+
+# --- combine features
+def combine_features(features, preprocess, num_coordinates):
+    """
+    Features: dictionary of numpy array; presumbly each having dimension >1
+
+    """
+    if 'neighbor' not in preprocess:
+
+        X = np.concatenate((features['regulators_neighbor_self'], features['regulators_self']), axis=1)
+        X_clf = X
+        X_full = X
+
+    else:
+
+        if 'neighbor_cat' in preprocess:
+            X = np.concatenate(
+                (features['regulators_neighbor_self'], features['regulators_self'], features['regulators_neighbor']),
+                axis=1)
+
+        elif 'neighbor_sum' in preprocess:
+            X = np.concatenate(
+                (features['regulators_neighbor_self'] + features['regulators_neighbor'], features['regulators_self']),
+                axis=1)
+
+        if features['neighbor_type'] is not None and features['baseline'] is not None:
+            X_clf = np.concatenate([features['baseline'][:, :num_coordinates], features['neighbor_type']], axis=1)
+            X_full = np.concatenate([X, X_clf], axis=1)
+
+        elif features['neighbor_type'] is not None:
+            X_clf = np.concatenate([features['neighbor_type']], axis=1)
+            X_full = np.concatenate([X, X_clf], axis=1)
+
+
+        elif features['baseline'] is not None:
+            X_clf = np.concatenate([features['baseline'][:, :num_coordinates]], axis=1)
+            X_full = np.concatenate([X, X_clf], axis=1)
+
+
+        else:
+            X_clf = X
+            X_full = X
+
+
+    return X, X_clf, X_full
