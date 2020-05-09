@@ -15,7 +15,7 @@ MESSI (**M**ixture of **E**xperts for **S**patial **S**ignaling genes **I**denti
 ## Installation 
 
 ```shell
-git clone https://github.com/doraadong/MESSI.git
+sudo pip3 install --upgrade  https://github.com/doraadong/MESSI/tarball/master
 ```
 
 # Command-line usage 
