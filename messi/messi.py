@@ -1,10 +1,27 @@
+"""
+Train and test MESSI model on an expression dataset.
+
+This script can either conduct cross-validation (when -mode = 'CV') where it goes through different
+CV set (eahc with an animal/sample left out), processing the features and responses, constructing and training
+a MESSI model and finalling saving the learned model and the prediction results. When -mode = 'train',
+It use all available samples to train and save the learned model.
+
+This file can also be imported as a module and contains the following
+functions:
+
+    * main - the main function of the script
+
+"""
+
+
+
 import sys
 import os
 import argparse
+import pickle
 
 import numpy as np
 import pandas as pd
-import pickle
 from sklearn.cluster import AgglomerativeClustering
 
 from data_processing import *
@@ -29,9 +46,9 @@ def main():
                                               "not available")
     parser.add_argument('-c', '--cellType', required=True,
                         default='Excitatory', help="string, cell type that will be built a model for, "
-                                                   "default 'Excitatory'")
+                                                   "use \\ for white-space, e.g. 'OD\ Mature\ 2', default 'Excitatory'")
     parser.add_argument('-m', '--mode', required=True,
-                        default='train', help="string, any of 'train', 'CV ; if 'train', then all data will be used "
+                        default='train', help="string, any of 'train', 'CV'; if 'train', then all data will be used "
                                               "for training and output a pickle file for learned parameters; if 'CV', "
                                               "then cross-validation will be conducted each time with an animal/sample "
                                               "left out and each CV run output a pickle file and prediction result, "
@@ -195,20 +212,25 @@ def main():
             neighbors_test = get_neighbors_datasets(datasets_test, "Del", k=10, dis_filter=dis_filter,
                                                     include_self=False)
         # set parameters for different feature types
-        feature_types = [{'name': 'regulators_neighbor', 'helper': preprocess_X_neighbor_per_cell,
-                          'feature_list_type': 'regulator_neighbor', 'per_cell': True, 'baseline': False,
-                          'standardize': True, 'log': True, 'poly': False},
-                         {'name': 'regulators_self', 'helper': preprocess_X_self_per_cell,
-                          'feature_list_type': 'regulator_self', 'per_cell': True, 'baseline': False,
-                          'standardize': True, 'log': True, 'poly': False},
-                         {'name': 'neighbor_type', 'helper': preprocess_X_neighbor_type_per_dataset,
-                          'feature_list_type': None, 'per_cell': False, 'baseline': False,
-                          'standardize': True, 'log': False, 'poly': False},
-                         {'name': 'baseline', 'helper': preprocess_X_baseline_per_dataset, 'feature_list_type': None,
-                          'per_cell': False, 'baseline': True, 'standardize': True, 'log': False, 'poly': False},
-                         {'name': 'regulators_neighbor_self', 'helper': preprocess_X_self_per_cell,
-                          'feature_list_type': 'regulator_neighbor', 'per_cell': True, 'baseline': False,
-                          'standardize': True, 'log': True, 'poly': False}]
+        lig_n = {'name': 'regulators_neighbor', 'helper': preprocess_X_neighbor_per_cell,
+                 'feature_list_type': 'regulator_neighbor', 'per_cell': True, 'baseline': False,
+                 'standardize': True, 'log': True, 'poly': False}
+        rec_s = {'name': 'regulators_self', 'helper': preprocess_X_self_per_cell,
+                 'feature_list_type': 'regulator_self', 'per_cell': True, 'baseline': False,
+                 'standardize': True, 'log': True, 'poly': False}
+        lig_s = {'name': 'regulators_neighbor_self', 'helper': preprocess_X_self_per_cell,
+                 'feature_list_type': 'regulator_neighbor', 'per_cell': True, 'baseline': False,
+                 'standardize': True, 'log': True, 'poly': False}
+        type_n = {'name': 'neighbor_type', 'helper': preprocess_X_neighbor_type_per_dataset,
+                  'feature_list_type': None, 'per_cell': False, 'baseline': False,
+                  'standardize': True, 'log': False, 'poly': False}
+        base_s = {'name': 'baseline', 'helper': preprocess_X_baseline_per_dataset, 'feature_list_type': None,
+                  'per_cell': False, 'baseline': True, 'standardize': True, 'log': False, 'poly': False}
+
+        if data_type == 'merfish_cell_line':
+            feature_types = [lig_n, rec_s, base_s, lig_s]
+        else:
+            feature_types = [lig_n, rec_s, type_n, base_s, lig_s]
 
         X_trains, X_tests, regulator_list_neighbor, regulator_list_self = prepare_features(data_type, datasets_train,
                                                                                            datasets_test,
@@ -268,13 +290,13 @@ def main():
 
             if current_cell_type not in ['OD Mature 2', 'Astrocyte', 'Endothelial 1']:
                 # soft weights
-                sub_condition = condition + '_soft'
+                sub_condition = f"{condition}_{model_name_gates}_{model_name_experts}_soft"
                 soft_weights = True
                 partial_fit_expert = True
 
             else:
                 # hard weights
-                sub_condition = condition + '_hard'
+                sub_condition = f"{condition}_{model_name_gates}_{model_name_experts}_soft"
                 soft_weights = False
                 partial_fit_expert = False
 
@@ -289,8 +311,8 @@ def main():
 
             # ------ construct MESSI  ------
             model = hme(n_classes_0, n_classes_1, model_name_gates, model_name_experts, num_response,
-                        init_labels_1=hier_labels, soft_weights=soft_weights,
-                        partial_fit_expert=partial_fit_expert, n_epochs=n_epochs, tolerance=tolerance)
+                        init_labels_1=hier_labels, soft_weights=soft_weights, partial_fit_expert=partial_fit_expert,
+                        n_epochs=n_epochs, tolerance=tolerance)
             # train
             model.train(X_train, X_train_clf_1, X_train_clf_2, Y_train)
 
