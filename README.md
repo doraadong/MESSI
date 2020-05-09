@@ -117,7 +117,7 @@ optional arguments:
 See [tutorials/MESSI_merfish_hypothalamus.ipynb](tutorials/MESSI_merfish_hypothalamus.ipynb), for a detailed intro on how to train and test a MESSI model, to infer signaling genes and subtypes from the learned parameters and other possible model configurations. 
 
 # Credits
-Group members from [System Biology Group @ Carnegie Mellon University](http://sb.cs.cmu.edu/).  
+The software is an implementation of the method MESSI, jointly developed by Dora Li, [Jun Ding](https://github.com/phoenixding) and Ziv Bar-Joseph from [System Biology Group @ Carnegie Mellon University](http://sb.cs.cmu.edu/).  
 
 # Contacts
 * dongshul at andrew.cmu.edu 
