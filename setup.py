@@ -13,7 +13,7 @@ DESCRIPTION = 'Mixture of Experts for Spatial Signaling genes Identification'
 URL = "https://github.com/doraadong/MESSI"
 EMAIL = 'dongshul@andrew.cmu.edu'
 AUTHOR = 'Dora Li'
-REQUIRES_PYTHON = '>=3.7.3'
+REQUIRES_PYTHON = '>=3.6'
 VERSION = '1.0.0'
 
 # What packages are required for this module to be executed?
