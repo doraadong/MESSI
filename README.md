@@ -123,5 +123,5 @@ The software is an implementation of the method MESSI, jointly developed by Dora
 * dongshul at andrew.cmu.edu 
 
 # License 
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md]) file for details
+This project is licensed under the MIT License - see the [LICENSE.md](LICENSE]) file for details
 
