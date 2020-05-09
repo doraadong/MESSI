@@ -1,8 +1,9 @@
-import sys, os
+import sys
+import os
 
-__all__ = ['__main__', 'hme', 'mrots', 'utils', 'readyData', 'data_processing']
 dir_path = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(dir_path)
 
+__all__ = ['messi', 'hme', 'mrots', 'utils', 'readyData', 'data_processing']
 for i in __all__:
     __import__(i)
