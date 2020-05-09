@@ -4,8 +4,8 @@ MESSI (**M**ixture of **E**xperts for **S**patial **S**ignaling genes **I**denti
 ![flowchart](./method_diagram.png)
 
 ## Table of Contents
-- [Get started](#Get\ started)
-- [Command-line usage](#Command-line\ usage )
+- [Get started](#Get&nbsp;started)
+- [Command-line usage](#Command-line&nbsp;usage )
 - [Tutorials](#Tutorials)
 
 # Get started 
