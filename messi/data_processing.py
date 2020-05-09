@@ -1,3 +1,12 @@
+"""
+Functions for processing data for MESSI.
+
+This includes functions to read helper data (e.g., ligand, receptor list), to read
+various types of expression data and their meta data, to construct neighberhood graph and find
+neighbors and to prepare features and response variables.
+
+"""
+
 import os
 
 import numpy as np
@@ -41,6 +50,17 @@ def get_lr_pairs(filename = 'ligand_receptor_pairs2.txt', input_path = 'input/')
 
 # meta data
 def read_meta_merfish(input_path, behavior_no_space, sex):
+    """
+    Get meta data of merfish hypothalamus datasets.
+
+    Returns:
+        meta_all: numpy array, sample size x meta features, meta data (e.g., animal ID or bregma) for a cell
+        meta_all_columns: dictionary, use column name as key for column index
+        cell_types_dict: dictionary, cell type as key and 0 as value; include all available cell types
+        genes_list: list of strings, all genes that are profiled in the dataset
+        genes_list_u: list of strings, same as genes_list but all letters are in uppercase
+
+    """
 
     # get default values (genes names, all cell types ) from a sample dataset
     filename = f"merfish_animal1_bregma026.csv"
@@ -81,6 +101,16 @@ female_ids = range(1,5)
 male_ids = range(5,12)
 
 def read_merfish_cell_line_data(input_path, bregma, animal_id, genes_list):
+    """
+
+    Read a subset of expression data by animal id and bregma (only for merfish
+    hypothalamus).
+
+    Returns:
+        hp_cor: pandas DataFrame, spatial coordinates
+        hp_genes: pandas DataFrame, gene expressions
+
+    """
     try:
         filename = f"expression_cor_dispersion_6000_{animal_id}.csv"
         print(f"Reading file: {filename}")
@@ -101,6 +131,17 @@ def read_merfish_cell_line_data(input_path, bregma, animal_id, genes_list):
         print(f"No file exist for this {bregma} of {animal_id}")
 
 def read_merfish_data(input_path, bregma, animal_id, genes_list):
+    """
+
+    Read a subset of expression data by animal id and bregma (only for merfish
+    hypothalamus).
+
+    Returns:
+        hp: pandas DataFrame, meta data
+        hp_cor: pandas DataFrame, spatial coordinates
+        hp_genes: pandas DataFrame, gene expressions
+
+    """
     
     try:
         bregma_format = ''.join(str(bregma).split('.'))
@@ -122,6 +163,18 @@ def read_merfish_data(input_path, bregma, animal_id, genes_list):
         print(f"No file exist for this {bregma} of {animal_id}")
         
 def read_starmap_combinatorial(input_path, animal_id, genes_list):
+
+    """
+
+    Read a subset of expression data by animal id and bregma (only for merfish
+    hypothalamus).
+
+    Returns:
+        meta: pandas DataFrame, meta data
+        cor: pandas DataFrame, spatial coordinates
+        genes: pandas DataFrame, gene expressions
+
+    """
     
     try:
         filename = f"meta_mPEC_{animal_id}.csv"
@@ -149,7 +202,16 @@ def read_starmap_combinatorial(input_path, animal_id, genes_list):
         
         
 def read_merfish_rna_seq_data(input_path, sex, animal_id, condition, genes_list=None):
-    
+    """
+
+    Read a subset of expression data by animal id and bregma (only for merfish
+    hypothalamus).
+
+    Returns:
+        hp: pandas DataFrame, meta data
+        hp_genes: pandas DataFrame, gene expressions
+
+    """
     try:
         filename = f"merfish_rna_seq_meta_{sex}_{animal_id}.csv"
         hp = pd.read_csv(os.path.join(input_path, filename), header = 0)
@@ -180,15 +242,16 @@ def read_merfish_rna_seq_data(input_path, sex, animal_id, condition, genes_list=
 def find_idx_for_train_test(samples_train, samples_test, meta_all, 
                             meta_all_columns, data_type, current_cell_type, 
                             get_idx_per_dataset, return_in_general=True, bregma=None):
-    '''
-    Get idx for individual cells for given lists of training and testing samples. 
+    """
+    Get index of individual cells for given lists of a training and testing samples/animals.
     
     Args:
-        samples_id_train: list, sample ID for training data; here sample might be 'FOV'(seqFISH+) or 'animals'(merFISH)
-        samples_id_test: list, sample ID for testing data; here sample might be 'FOV'(seqFISH+) or 'animals'(merFISH)
-        meta_all: pandas DataFrame, meta information (animal id, FOV, bregma, cell type) of 
-                  ALL cells of the same condition (say, all naive animals)
-        condition: 
+        samples_id_train: list, sample ID for training data; here sample might be 'animals'(merFISH) or 'FOV'(seqFISH+)
+        samples_id_test: list, sample ID for testing data; here sample might be 'animals'(merFISH) or 'FOV'(seqFISH+)
+        meta_all: numpy array, sample size x meta features, meta data (e.g., animal ID or bregma) for all cells of \
+the same condition (say, all naive animals)
+        meta_all_columns: dictionary, use column name as key for column index
+
     Returns:
         idx_train: list, index of training cells in meta_all 
         idx_test: list, index of testing cells in meta_all
@@ -201,7 +264,8 @@ def find_idx_for_train_test(samples_train, samples_test, meta_all,
         
         meta_per_dataset_train: list of list of ['animal_id', 'bregma'] for each dataset of training 
         meta_per_dataset_test: list of list of ['animal_id', 'bregma'] for each dataset of testing 
-    '''
+
+    """
     if data_type == 'seqfish':
     
         idx_train_general = []
@@ -227,7 +291,7 @@ def find_idx_for_train_test(samples_train, samples_test, meta_all,
 
             idx_test = []
             for fov in samples_test:
-                idx_test = idx_test + list(meta_allindex[(meta_all['Field of View'] == fov) & (meta_all['cell_types'] == current_cell_type)])
+                idx_test = idx_test + list(meta_all.index[(meta_all['Field of View'] == fov) & (meta_all['cell_types'] == current_cell_type)])
 
         idx_train_in_general = [idx_train_general.index(i) for i in idx_train]
         idx_test_in_general = [idx_test_general.index(i) for i in idx_test]
@@ -235,7 +299,7 @@ def find_idx_for_train_test(samples_train, samples_test, meta_all,
         print(len(idx_train))
         print(len(idx_test))
         
-        return idx_train, idx_test, idx_train_in_general, idx_test_in_general, _, _, _, _,
+        return idx_train, idx_test, idx_train_in_general, idx_test_in_general, None, None, None, None
     
     elif 'merfish' in data_type or data_type == 'starmap': 
         
@@ -288,10 +352,10 @@ def find_idx_for_train_test(samples_train, samples_test, meta_all,
 
 def get_idx_per_dataset_merfish_cell_line(samples, meta_all, meta_all_columns,
                                         single_bregma=None, current_cell_type=None):
-    '''
+    """
     Helper function for find_idx_for_train_test.
 
-    '''
+    """
 
     idx_in_all = []
     idx_in_dataset = []
@@ -315,45 +379,13 @@ def get_idx_per_dataset_merfish_cell_line(samples, meta_all, meta_all_columns,
 
     return idx_in_all, idx_in_dataset, meta_per_dataset
 
-def get_idx_per_dataset_merfish_rna_seq(samples, meta_all, meta_all_columns, 
-                                        single_bregma = None, current_cell_type = None):
-    '''
-    Helper function for find_idx_for_train_test. 
-    
-    '''
-
-    idx_in_all = []
-    idx_in_dataset = []
-    meta_per_dataset = []  
-
-    for animal in samples:
-        print(animal)
-
-        if current_cell_type is not None:
-            _condition = (meta_all[:, meta_all_columns['Animal_ID']] == animal) & \
-            (meta_all[:, meta_all_columns['Cell_class']] == current_cell_type)
-        else:
-            _condition = (meta_all[:, meta_all_columns['Animal_ID']] == animal)
-
-    #         _idx_in_all = list(meta_all.index[_condition].values)
-    #         idx_in_all = idx_in_all + _idx_in_all
-
-        _subidx = np.where(_condition)[0]
-        _subset = meta_all[_condition,:]
-        idx_in_all_animal = list(_subidx)
-        idx_in_dataset.append(list(_subset[:,meta_all_columns['ID_in_dataset']]))
-        meta_per_dataset.append([animal, None])
-
-        idx_in_all = idx_in_all + idx_in_all_animal 
-
-    return idx_in_all, idx_in_dataset, meta_per_dataset
-
 def get_idx_per_dataset_starmap_combinatorial(samples, meta_all, meta_all_columns, 
                                         single_bregma = None, current_cell_type = None):
-    '''
-    Helper function for find_idx_for_train_test. 
-    
-    '''
+    """
+
+    Helper function for find_idx_for_train_test.
+
+    """
 
     idx_in_all = []
     idx_in_dataset = []
@@ -381,12 +413,15 @@ def get_idx_per_dataset_starmap_combinatorial(samples, meta_all, meta_all_column
 
     return idx_in_all, idx_in_dataset, meta_per_dataset
 
-        
+# get_idx_per_dataset_merfish_rna_seq = get_idx_per_dataset_starmap_combinatorial()
+
+
 def get_idx_per_dataset_merfish(samples, meta_all, meta_all_columns, single_bregma = None, current_cell_type = None):
-    '''
-    Helper function for find_idx_for_train_test. 
-    
-    '''
+    """
+
+    Helper function for find_idx_for_train_test.
+
+    """
 
     idx_in_all = []
     idx_in_dataset = []
@@ -434,21 +469,34 @@ def get_idx_per_dataset_merfish(samples, meta_all, meta_all_columns, single_breg
 # --- find neighbors
 
 def find_neighbors(pindex, tri):
+    """
+    By @user2535797 at https://stackoverflow.com/questions/12374781/how-to-find-all-neighbors-of-a-given-point-\
+    in-a-delaunay-triangulation-using-sci
 
+    Args:
+        pindex: a index of a single point
+        tri: output from scipy.Delaunay() method
+
+    Returns:
+        neighbors for a data point
+
+    """
     return tri.vertex_neighbor_vertices[1][tri.vertex_neighbor_vertices[0][pindex]:tri.vertex_neighbor_vertices[0][pindex+1]]
 
 
 def get_Delaunay_neighbors(X, dis_filter = 100, include_self = True):
-    '''
+    """
+    Get neighbors based on Delaunay triangulation and physical distance filters.
+
     Args:
-        X: np.array or pd.DataFrame, first dimension as data points and 2nd dimension as features 
-        include_self:boolean, if include self in neighbors 
-    
-    Return:
-        neighbors_filtered:
-            list, neighbors filtered by euclidean distance ordered as in X 
-    
-    '''
+        X: np.array or pd.DataFrame, first dimension as data points and 2nd dimension as features
+        include_self:boolean, if include self in neighbors
+        dis_filter: integer, distance in micrometers to filter neighbor pairs; default 100
+        include_self: boolean, if to include the point itself as its neighbors; default true
+
+     Return:
+        neighbors_filtered: list, neighbors filtered by euclidean distance ordered as in X
+    """
     tri = Delaunay(X)
     distmat = squareform(pdist(X, 'euclidean'))
     neighbors_filtered = []
@@ -465,6 +513,14 @@ def get_Delaunay_neighbors(X, dis_filter = 100, include_self = True):
     return neighbors_filtered
 
 def get_neighbors_datasets(data_sets, neighbor_type, k=10, dis_filter=100, include_self = True):
+    """
+
+    Process each dataset one by one to get neighbors for each single cell.
+
+    Returns:
+        neighbors_all: list of numpy arrays, each containing neighboring info of a dataset
+
+    """
     
     neighbors_all = []
     
@@ -490,6 +546,41 @@ def prepare_features(data_type, datasets_train, datasets_test, meta_per_dataset_
                      neighbors_train, neighbors_test,
                      feature_types, regulator_list_prior, top_k_regulator,
                      genes_filtered, l_u, r_u, cell_types_dict):
+    """
+
+    Generate different types of features.
+
+    Args:
+        data_type: string, merfish/starmap/merfish_cell_line
+        datasets_train: list of numpy arrays & dictionaries; all info for training samples;in the format
+            [current_meta, gene_exp, current_cor]
+        datasets_test: list of numpy arrays & dictionaries; all info for testing samples;in the format
+            [current_meta, gene_exp, current_cor]
+        meta_per_dataset_train: list of list of ['animal_id', 'bregma'] for each dataset of training
+        meta_per_dataset_test: list of list of ['animal_id', 'bregma'] for each dataset of testing
+        idx_train: list, index of training cells in the meta dataset containing all samples for a particular behavior
+        idx_test: list, index of testing cells in the meta dataset containing all samples for a particular behavior
+        idx_train_in_dataset: list of list of index of training cells in each dataset (as grouped by animal & bregma)
+        idx_test_in_dataset: list of list of index of testing cells in each dataset (as grouped by animal & bregma)
+        neighbors_train: list of numpy arrays, neighboring info for the training samples
+        neighbors_test: list of numpy arrays, neighboring info for the testing samples
+        feature_types: dictionary, each specifying parameters of a particular feature type
+        regulator_list_prior: list of strings, ligand or receptor list known as prior
+        top_k_regulator: integer, top K ligand/receptors to be used as features; the features will be sorted \
+        according to dispersion (descending); default None
+        genes_filtered: list of strings, all genes profiled in the expression data; all letters are in uppercase
+        l_u: list of strings, ligands from the database; all letters are in uppercase
+        r_u: list of strings, receptors from the database; all letters are in uppercase
+        cell_types_dict: dictionary, cell type as key and 0 as value; include all available cell types
+
+    Returns:
+        X_trains: dictionary, each item for a type of features
+        X_tests: dictionary, each item for a type of features
+        regulator_list_neighbor: list of strings, ligands used as features for neighboring cells' expression
+        regulator_list_self: list of strings, ligands and receptors used as features for cell's own expression
+
+    """
+
     if regulator_list_prior is not None:
         regulator_list_neighbor = [g for g in regulator_list_prior if g in l_u]
         regulator_list_self = [g for g in regulator_list_prior if g in r_u]
@@ -499,8 +590,7 @@ def prepare_features(data_type, datasets_train, datasets_test, meta_per_dataset_
         regulator_list_self = [g for g in genes_filtered if g in r_u]
         total_regulators = regulator_list_neighbor + regulator_list_self
 
-    ## neighborhood
-    ### initialize
+    # initialize
     X_trains = {'regulators_neighbor': None, 'regulators_self': None, 'neighbor_type': None, 'baseline': None,
                 'regulators_neighbor_self': None, 'regulators_neighbor_by_type': None}
     X_tests = {'regulators_neighbor': None, 'regulators_self': None, 'neighbor_type': None, 'baseline': None,
@@ -612,13 +702,13 @@ def preprocess_concatenate_X_datasets(data_sets, meta_per_dataset, data_type, cu
                                       current_nns, feature_list, preprocess_X, cell_types_dict,
                                       neighbor_type='Del', log=False, per_cell=True,
                                       baseline=False, poly=True):
-    '''
+    """
     Integrate merFISH datasets for a given set of datasets. A wrapper function over the pre-
     -processing functions of X of each dataset. Concatenate preprocessed datasets and transform.
     For baseline covariates, add 1 more covariate: bregma.
 
     Args:
-        data_sets: list of list of pandas DataFrames, in the format
+        data_sets: list of list of numpy arrays and dictionaries, in the format
             [current_meta, gene_exp, current_cor]
         log: boolean, if take transformation as log(x+1)
         preprocess_X: function, helper function to process different features for each cell/dataset(baseline)
@@ -626,7 +716,7 @@ def preprocess_concatenate_X_datasets(data_sets, meta_per_dataset, data_type, cu
     Return:
         X: numpy.array, concatenated accross datasets
 
-    '''
+    """
 
     # for general covariates
     X_all_list = []
@@ -700,28 +790,27 @@ def preprocess_concatenate_X_datasets(data_sets, meta_per_dataset, data_type, cu
 def preprocess_X_neighbor_by_type_per_cell(i, data_type, current_meta, meta_columns, current_cor, 
                                        cor_columns, gene_exp, gene_exp_columns, current_nn,
                                        current_idx, feature_list_idx, cell_types_dict,nn_type = 'Del'): 
-    '''
-    
-    i: 0,1,2.. index 
-    
-    dataset specific:
-        current_nn: numpy array, neighbors for cells in current dataset  
-        current_cor
-        gene_exp
-        data_type: seqfish, merfish or 
-        
-        
-       
-    
-    train/test specific:
-        current_idx: list, index regarding the current dataset  
-        
-    feature type specific:
-        feature_list
-        nn_type
-    
-    '''
-    
+    """
+    Get neighboring expression as features for a single cell; sum the expression from different cell types separately.
+    (not used currently)
+
+    Args:
+        i: integer, index of a cell in the current dataset
+        data_type: string, merfish/starmap/merfish_cell_line
+        current_meta: numpy array, meta info for the current dataset
+        meta_columns: dictionary, use column name as key for column index
+        current_cor: numpy array, spatial coordimates for the current dataset
+        cor_columns: dictionary, use column name (e.g. cor_x, cor_y) as key for column index
+        gene_exp: numpy array, gene expression for the current dataset
+        gene_exp_columns: dictionary, use column name (gene names) as key for column index
+        current_nn: numpy array, neighbors for cells in current dataset
+        current_idx: list, index regarding the current dataset
+        feature_list_idx: list of integers, index of the ligand to be used as neighboring features
+        cell_types_dict: dictionary, cell type as key and 0 as value; include all available cell types
+        nn_type: string, type of neighbors, Del(Delaunay) or k-nn
+
+    """
+
     idx_in_full = current_idx[i]
     _nn = current_nn[idx_in_full]
     
@@ -766,25 +855,26 @@ def preprocess_X_neighbor_by_type_per_cell(i, data_type, current_meta, meta_colu
 
 def preprocess_X_neighbor_per_cell(i, data_type, current_meta, meta_columns, current_cor, 
                                 cor_columns, gene_exp, gene_exp_columns, current_nn,
-                                current_idx, feature_list_idx, cell_types_dict,nn_type = 'Del'): 
-    '''
-    
-    i: 0,1,2.. index 
-    
-    dataset specific:
-        current_nn: numpy array, neighbors for cells in current dataset  
-        current_cor
-        gene_exp
-        data_type: seqfish, merfish or starmap
-    
-    train/test specific:
-        current_idx: list, index regarding the current dataset  
-        
-    feature type specific:
-        feature_list
-        nn_type
-    
-    '''
+                                current_idx, feature_list_idx, cell_types_dict,nn_type = 'Del'):
+    """
+     Get neighboring expression as features for a single cell; sum the expression from different cell jointly.
+
+     Args:
+         i: integer, index of a cell in the current dataset
+         data_type: string, merfish/starmap/merfish_cell_line
+         current_meta: numpy array, meta info for the current dataset
+         meta_columns: dictionary, use column name as key for column index
+         current_cor: numpy array, spatial coordimates for the current dataset
+         cor_columns: dictionary, use column name (e.g. cor_x, cor_y) as key for column index
+         gene_exp: numpy array, gene expression for the current dataset
+         gene_exp_columns: dictionary, use column name (gene names) as key for column index
+         current_nn: numpy array, neighbors for cells in current dataset
+         current_idx: list, index regarding the current dataset
+         feature_list_idx: list of integers, index of the ligand to be used as neighboring features
+         cell_types_dict: dictionary, cell type as key and 0 as value; include all available cell types
+         nn_type: string, type of neighbors, Del(Delaunay) or k-nn
+
+     """
         
     idx_in_full = current_idx[i]
     _nn = current_nn[idx_in_full]
@@ -818,6 +908,24 @@ def preprocess_X_neighbor_per_cell(i, data_type, current_meta, meta_columns, cur
 def preprocess_X_self_per_cell(i, data_type, current_meta, meta_columns, current_cor, 
                                 cor_columns, gene_exp, gene_exp_columns, current_nn,
                                 current_idx, feature_list_idx, cell_types_dict,nn_type = 'Del'):
+    """
+     Get cell's own expression as features for a single cell.
+     Args:
+         i: integer, index of a cell in the current dataset
+         data_type: string, merfish/starmap/merfish_cell_line
+         current_meta: numpy array, meta info for the current dataset
+         meta_columns: dictionary, use column name as key for column index
+         current_cor: numpy array, spatial coordimates for the current dataset
+         cor_columns: dictionary, use column name (e.g. cor_x, cor_y) as key for column index
+         gene_exp: numpy array, gene expression for the current dataset
+         gene_exp_columns: dictionary, use column name (gene names) as key for column index
+         current_nn: numpy array, neighbors for cells in current dataset
+         current_idx: list, index regarding the current dataset
+         feature_list_idx: list of integers, index of the ligand to be used as neighboring features
+         cell_types_dict: dictionary, cell type as key and 0 as value; include all available cell types
+         nn_type: string, type of neighbors, Del(Delaunay) or k-nn
+
+     """
 
     idx_in_full = current_idx[i]
     x_self = gene_exp[idx_in_full, feature_list_idx]
@@ -830,6 +938,25 @@ def preprocess_X_self_per_cell(i, data_type, current_meta, meta_columns, current
 def preprocess_X_neighbor_type_per_dataset(data_type, current_meta, meta_columns, current_cor, 
                                        cor_columns, gene_exp, gene_exp_columns, current_nn,
                                        current_idx, cell_types_dict, nn_type = 'Del', poly = True):
+    """
+     Get cell's neighboring cell types for a single cell.
+
+     Args:
+         i: integer, index of a cell in the current dataset
+         data_type: string, merfish/starmap/merfish_cell_line
+         current_meta: numpy array, meta info for the current dataset
+         meta_columns: dictionary, use column name as key for column index
+         current_cor: numpy array, spatial coordimates for the current dataset
+         cor_columns: dictionary, use column name (e.g. cor_x, cor_y) as key for column index
+         gene_exp: numpy array, gene expression for the current dataset
+         gene_exp_columns: dictionary, use column name (gene names) as key for column index
+         current_nn: numpy array, neighbors for cells in current dataset
+         current_idx: list, index regarding the current dataset
+         feature_list_idx: list of integers, index of the ligand to be used as neighboring features
+         cell_types_dict: dictionary, cell type as key and 0 as value; include all available cell types
+         nn_type: string, type of neighbors, Del(Delaunay) or k-nn
+
+     """
 
     x_list = []
     for i in range(0,len(current_idx)):
@@ -856,20 +983,32 @@ def preprocess_X_neighbor_type_per_dataset(data_type, current_meta, meta_columns
 def preprocess_X_baseline_per_dataset(data_type, current_meta, meta_columns, current_cor, 
                                        cor_columns, gene_exp, gene_exp_columns, current_nn,
                                        current_idx, cell_types_dict, nn_type = 'Del', poly = False):
-    
-    '''
-    Preprocess for baseline covariates.
-    
-    Args:
-        cell_types_dict: dict, keys as all possible cell types and values all 0
-    
-    '''
+    """
+     Get cell's baselines (spatial coordinates) as features for a single cell.
+
+     Args:
+         i: integer, index of a cell in the current dataset
+         data_type: string, merfish/starmap/merfish_cell_line
+         current_meta: numpy array, meta info for the current dataset
+         meta_columns: dictionary, use column name as key for column index
+         current_cor: numpy array, spatial coordimates for the current dataset
+         cor_columns: dictionary, use column name (e.g. cor_x, cor_y) as key for column index
+         gene_exp: numpy array, gene expression for the current dataset
+         gene_exp_columns: dictionary, use column name (gene names) as key for column index
+         current_nn: numpy array, neighbors for cells in current dataset
+         current_idx: list, index regarding the current dataset
+         feature_list_idx: list of integers, index of the ligand to be used as neighboring features
+         cell_types_dict: dictionary, cell type as key and 0 as value; include all available cell types
+         nn_type: string, type of neighbors, Del(Delaunay) or k-nn
+
+     """
    
 
     # prepare baseline features 
     if data_type == 'seqfish':
         # for the categories not present, fill them all 0
         dummies = pd.get_dummies(current_meta['Cell_class'][current_idx], prefix='', prefix_sep='')
+        full_cell_types = list(cell_types_dict.keys())
         cell_type_one_hot  = dummies.T.reindex(full_cell_types).T.fillna(0)
         cell_type_one_hot.reset_index(inplace=True, drop=True)
         cor_sub = current_cor[['X','Y']].iloc[current_idx,:]
@@ -897,10 +1036,12 @@ def preprocess_X_baseline_per_dataset(data_type, current_meta, meta_columns, cur
         elif current_cor is not None:
              X = cor_sub
         else:
-            print("Both cell type info and coordinates info NOT available!")
+            raise TypeError("Both cell type info and coordinates info NOT available! No baselie featues "
+                            "should be generated")
             return None
     else:
-        print ('Please specify data type!')
+        raise NotImplementedError (f"Only support merfish/starmap/mefish_cell_line")
+
         return None
     
     if poly:
@@ -919,6 +1060,42 @@ def prepare_responses(data_type, datasets_train, datasets_test, idx_train_in_gen
                       idx_train_in_dataset, idx_test_in_dataset, neighbors_train, neighbors_test,
                       response_type, log_response, response_list_prior, top_k_response,
                       genes_filtered, l_u, r_u):
+    """
+
+    Generate response variables.
+
+    Args:
+        data_type: string, merfish/starmap/merfish_cell_line
+        datasets_train: list of numpy arrays & dictionaries; all info for training samples;in the format
+           [current_meta, gene_exp, current_cor]
+        datasets_test: list of numpy arrays & dictionaries; all info for testing samples;in the format
+           [current_meta, gene_exp, current_cor]
+        idx_train_in_general:list, index of training cells in the general (all cell types) list
+        idx_test_in_general:list, index of testing cells in the general (all cell types) list
+        idx_train_in_dataset: list of list of index of training cells in each dataset (as grouped by animal & bregma)
+        idx_test_in_dataset: list of list of index of testing cells in each dataset (as grouped by animal & bregma)
+        neighbors_train: list of numpy arrays, neighboring info for the training samples
+        neighbors_test: list of numpy arrays, neighboring info for the testing samples
+        response_type: string, if use raw expression value as response ('original')
+        log_response: boolean, if use log transformed expression values for response
+        response_list_prior: list of strings, list of responses genes from prior
+        top_k_response: integer, top K response genes to be used as response; they will be sorted \
+        according to dispersion (descending); default None
+        genes_filtered: list of strings, all genes profiled in the expression data; all letters are in uppercase
+        l_u: list of strings, ligands from the database; all letters are in uppercase
+        r_u: list of strings, receptors from the database; all letters are in uppercase
+
+       Returns:
+           Y_train: numpy array, sample size x number of responses, processed values (can still be same as _true if \
+           response_type = 'original')
+           Y_train_true: numpy array, sample size x number of responses, raw values
+           Y_test: numpy array, sample size x number of responses, processed values (can still be same as _true if \
+           response_type = 'original')
+           Y_test_true: numpy array, sample size x number of responses, raw values
+           response_list: list of strings, names of genes used for responses
+
+       """
+
     if response_list_prior is not None:
         feature_list = response_list_prior
         response_list = feature_list
@@ -978,21 +1155,21 @@ def prepare_responses(data_type, datasets_train, datasets_test, idx_train_in_gen
 def preprocess_Y_datasets(data_sets, data_type, current_idxs, current_idx_in_general,
                           feature_list, bins, response_type, baseline_file=None, log=False, transformer=None,
                           scale=False):
-    '''
+    """
 
     Preprocess for response variables Y for a data sets. The dataset contains info for a single animal's bregma.
 
     Args:
-        data_sets: list of list of pandas DataFrames, in the format [current_meta, gene_exp, current_cor]
+        data_sets: list of list of numpy arrays and dictionaries, in the format [current_meta, gene_exp, current_cor]
         response_type: string, one of ['original', 'residual', 'residual_category']
         current_idxs: list of list of index of cells in each dataset
         current_idx_in_general: list, sub-group index in all datasets(all animals/FOVs)
     Return:
-        Y_processed: pandas DataFrame, processed response variables
-        Y_true: pandas DataFrame, original values
+        Y_processed: numpy array, processed response variables
+        Y_true: numpy array, original values
         transformer: None or a StandardScaler object
 
-    '''
+    """
 
     # Prepare the true/original Y
     Y_true_all = []
@@ -1073,14 +1250,16 @@ def preprocess_Y_datasets(data_sets, data_type, current_idxs, current_idx_in_gen
 flatten = lambda l: [item for sublist in l for item in sublist]
 
 def filter_by_response(Y_processed, Y_true, criterion = 'non-zero'):
-    '''
+    """
+
     Args:
-        Y_processed: pandas DataFrame, processed response variables 
-        Y_true: pandas DataFrame, original values
-    
+        Y_processed: numpy array, processed response variables
+        Y_true: numpy rray, original values
+
     Returns:
         idx_per_response: list of list of indexes of each response variable; order as in Y_true
-    '''
+
+    """
     
     idx_per_response = []
     for i in range(0,Y_true.shape[1]):
