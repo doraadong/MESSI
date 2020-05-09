@@ -13,9 +13,11 @@ MESSI (**M**ixture of **E**xperts for **S**patial **S**ignaling genes **I**denti
 -- pandas >= 0.25.3  
 
 ## Installation 
+
 ```shell
-git clone https://github.com/doraadong/MESSI.git
+pip install messi
 ```
+
 # Command-line usage 
 
 ## Download data and convert to required formats
