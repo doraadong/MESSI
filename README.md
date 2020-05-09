@@ -3,6 +3,11 @@ MESSI (**M**ixture of **E**xperts for **S**patial **S**ignaling genes **I**denti
 
 ![flowchart](./method_diagram.png)
 
+## Table of Contents
+- [Get started](#Get started)
+- [Command-line usage](#Command-line usage )
+- [Tutorials](#Tutorials)
+
 # Get started 
 ## Prerequisites 
 * Python >= 3.6
