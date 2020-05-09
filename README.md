@@ -15,7 +15,7 @@ MESSI (**M**ixture of **E**xperts for **S**patial **S**ignaling genes **I**denti
 ## Installation 
 
 ```shell
-pip install messi
+git clone https://github.com/doraadong/MESSI.git
 ```
 
 # Command-line usage 
