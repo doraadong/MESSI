@@ -114,12 +114,13 @@ optional arguments:
 ```
 
 # Tutorials
-
 See [tutorials/MESSI_merfish_hypothalamus.ipynb](tutorials/MESSI_merfish_hypothalamus.ipynb), for a detailed intro on how to train and test a MESSI model, to infer signaling genes and subtypes from the learned parameters and other possible model configurations. 
 
 
-# Credits
-This software was developed by the [System Biology Group @ Carnegie Mellon University](http://sb.cs.cmu.edu/).
-Implemented by Dongshunyi (Dora) Li. 
+# Contacts
+* [System Biology Group @ Carnegie Mellon University](http://sb.cs.cmu.edu/).  
+* dongshul at andrew.cmu.edu 
 
+# License 
+This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md]) file for details
 
