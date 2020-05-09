@@ -20,13 +20,11 @@ sudo pip3 install --upgrade  https://github.com/doraadong/MESSI/tarball/master
 
 # Command-line usage 
 
-## Download data and convert to required formats
-Change to the sub directory by: 
+## Download data and convert to required formats using utils/readyData.py:
 
-```shell
-cd ./messi 
-```
-Execute the python file readyData.py by (for example): 
+Download the script **utils/readyData.py**. 
+
+Execute the python file (arguments are taken for example): 
 
 ```shell
 python readyData.py -i ../input/ -d merfish
@@ -48,15 +46,10 @@ optional arguments:
 
 ## Train (and test) MESSI model 
 
-Change to the sub directory by: 
-
-```shell
-cd ./messi 
-```
 Execute the python file messi.py by (for example): 
 
 ```shell
-python messi.py -i ../input/ -o ../output/ -d merfish -g Female -b Parenting -c Excitatory -m train -c1 1 -c2 8 -e 5
+messi -i ../input/ -o ../output/ -d merfish -g Female -b Parenting -c Excitatory -m train -c1 1 -c2 8 -e 5
 ```
 The usage of this file is listed as follows:  
 
