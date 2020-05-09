@@ -1,3 +1,19 @@
+"""
+Download and preprocess an expression dataset.
+
+For a particular type of data, the script first downloads it at ta user-defined folder. It then preprocess
+it (by cutting the whole dataset into subsets based on animal/sample ID and other info (e.g., bregma)) and
+produces files with meta informations. All preprocessed files will be saved at the same user-defined folder.
+
+This file can also be imported as a module and contains the following
+functions:
+    * process_merfish_raw - save samples separately from the downloaded file; also save meta info files
+    * main - the main function of the script
+
+"""
+
+
+
 import os
 import argparse
 import urllib.request
