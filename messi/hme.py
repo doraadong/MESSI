@@ -13,13 +13,9 @@ from utils import *
 
 
 class hme:
+    """
 
-    def __init__(self, n_classes_0, n_classes_1, model_name_gates, model_name_experts, num_responses,
-                 group_by_likelihood=True, idx_conditioned=None, conditional=False, init_labels_0=None,
-                 init_labels_1=None, soft_weights=True, partial_fit_gate=False, partial_fit_expert=False,
-                 tolerance=3, n_epochs=20, random_state=222):
-        """
-        Implementation of hierachical mixture model (Jordan & Jocab,1994) with various
+     Implementation of hierachical mixture model (Jordan & Jocab,1994) with various
         options for gates and experts.
 
         5/3/20:
@@ -29,6 +25,13 @@ class hme:
             2. based on errors instead of objective Q(,)
         c. in training, if no sample assigned to a class then the class will be removed
 
+    """
+
+    def __init__(self, n_classes_0, n_classes_1, model_name_gates, model_name_experts, num_responses,
+                 group_by_likelihood=True, idx_conditioned=None, conditional=False, init_labels_0=None,
+                 init_labels_1=None, soft_weights=True, partial_fit_gate=False, partial_fit_expert=False,
+                 tolerance=3, n_epochs=20, random_state=222):
+        """
 
         Args:
             n_classes_0: integer, number of classes for the 1st layer; set as 1 if only allow 1 layer
@@ -39,8 +42,8 @@ class hme:
             group_by_likelihood: boolean, if samples assigned to experts by likelihood; default true
             idx_conditioned: list of integers, index of response variables that are conditional for likelihood; default none
             conditional: boolean, if likelihood is conditional or not; default false
-            init_labels_0: list of cluster labels (0,1,..) for level 1, N x 1, initialized grouping of samples; default none
-            init_labels_1: list of list of cluster labels (0,1,..) for level 2, initialized grouping of samples; default none
+            init_labels_0: list of integers, cluster labels (starting from 0) for level 1, N x 1, initialized grouping of samples; default none
+            init_labels_1: list of list of integers, cluster labels (starting from 0) for level 2, initialized grouping of samples; default none
             soft_weights: boolean, if apply soft grouping of samples; default true
             partial_fit_gate: boolean, run for 1 epoch only, using all training samples; default false
             partial_fit_expert: boolean, run for 1 epoch only, using all training samples; default false
@@ -213,6 +216,9 @@ class hme:
             Y_hat: numpy array, (total) sample size x number of responses, predictions from this expert
             errors: float, (unweighted) mean square error on the assigned training samples
 
+        Raises:
+            TypeError: if the expert model does not support sample_weight keyword
+
         """
         # get subset data for training
         _X = X_train[idx_subset, :]
@@ -249,7 +255,11 @@ class hme:
                     _y = _Y
 
                 sub_model = model[i]
-                sub_model.fit(_X, _y, sample_weight=weight)
+
+                try:
+                    sub_model.fit(_X, _y, sample_weight=weight)
+                except TypeError:
+                    sub_model.fit(_X, _y)
 
                 # get prediction for all samples
                 y_hat = sub_model.predict(X_train)
@@ -261,7 +271,7 @@ class hme:
                 Y_hat.append(y_hat)
                 errors.append(error)
 
-            errors = np.array(errors)
+            errors = np.array(errors).T
             Y_hat = np.array(Y_hat).T
 
         return Y_hat, errors
@@ -699,7 +709,7 @@ class hme:
 
             # early stopping (either label or score does not further change)
             # NOTE: here stopping is based on training set;
-
+            print(f"------ epoch {epoch + 1} ------")
             print(f"Best score: {best_overall_score}")
             print(f"Current score: {_score}")
             print(f"level 1 gate error: {errors_level_0}")
@@ -715,7 +725,7 @@ class hme:
             if stop_flag:
                 break
 
-            print(f"{epoch + 1} epochs in total")
+        print(f"{epoch + 1} epochs in total")
 
     def predict(self, X_test, X_test_clf_1, X_test_clf_2):
 
