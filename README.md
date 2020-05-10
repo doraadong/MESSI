@@ -25,7 +25,7 @@ sudo pip3 install --upgrade  https://github.com/doraadong/MESSI/tarball/master
 
 # Command-line usage 
 
-## Download expression data and convert to required formats:
+## Download expression data and convert it to required formats:
 
 Download the script [utils/readyData.py](utils/readyData.py). 
 
@@ -119,7 +119,11 @@ optional arguments:
 ```
 
 # Tutorials
-See [tutorials/MESSI_merfish_hypothalamus.ipynb](tutorials/MESSI_merfish_hypothalamus.ipynb), for a detailed intro on how to train and test a MESSI model, to infer signaling genes and subtypes from the learned parameters and other possible model configurations. 
+See [tutorials/MESSI_merfish_hypothalamus.ipynb](tutorials/MESSI_merfish_hypothalamus.ipynb), for a detailed intro on how to 
+  * Train and test a MESSI model
+  * Analyze the model parameters to infer cell subtypes differ in signaling genes
+  * Train and test the data with other configurations
+
 
 # Credits
 The software is an implementation of the method MESSI, jointly developed by Dora Li, [Jun Ding](https://github.com/phoenixding) and Ziv Bar-Joseph from [System Biology Group @ Carnegie Mellon University](http://sb.cs.cmu.edu/).  
