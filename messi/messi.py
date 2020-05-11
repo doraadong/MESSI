@@ -2,8 +2,8 @@
 Train and test MESSI model on an expression dataset.
 
 This script can either conduct cross-validation (when -mode = 'CV') where it goes through different
-CV set (eahc with an animal/sample left out), processing the features and responses, constructing and training
-a MESSI model and finalling saving the learned model and the prediction results. When -mode = 'train',
+CV set (each with an animal/sample left out), processing the features and responses, constructing and training
+a MESSI model and finally saving the learned model and the prediction results. When '-mode' = 'train',
 It use all available samples to train and save the learned model.
 
 This file can also be imported as a module and contains the following
@@ -12,8 +12,6 @@ functions:
     * main - the main function of the script
 
 """
-
-
 
 import sys
 import os
