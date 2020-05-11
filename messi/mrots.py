@@ -9,21 +9,29 @@ from messi.utils import *
 
 class mrots:
     """
-            A weighted version of MROTS model based on (Rai, 2012), (Cai, 2014)
-        and Iteratively Reweighted Least Squares (IRLS) algorithm.
+    A weighted version of MROTS model based on (Rai, 2012), (Cai, 2014)
+    and Iteratively Reweighted Least Squares (IRLS) algorithm.
+
+    Parameters
+    ----------
+            lams: list of floats
+                parameters for the regularlizers
+            no_intercept: boolean
+                if not include intercept in the model, default false
+            sparse_omega: boolean
+                if assume sparsity for the conditional covariance among responses, default false
+            warm_start: boolean
+                if use the estimates from previous iterations as initialization, default fasle
+            n_iters: integer
+                number of iterations, default 20
+            verbose: boolean
+                if print out parameter settings and objective values at each iteration, default false
+
     """
 
     def __init__(self, lams, no_intercept=False, sparse_omega=False,
                  warm_start=False, n_iters=20, verbose = False):
-        """
 
-        Args:
-            lams: list of floats, parameters for the regularlizers
-            no_intercept: boolean, if include intercept in the model; default included
-            sparse_omega: boolean, if assume sparsity for the conditional covariance among responses
-            warm_start: boolean, if use the estimates from previous iterations as initialization
-            n_iters: integer, number of iterations, default 20
-        """
         self.lam, self.lam1, self.lam2, self.lam3 = lams[0], lams[1], \
                                                     lams[2], lams[3]
         self.no_intercept = no_intercept
@@ -43,13 +51,19 @@ class mrots:
         """
         Train MROTS using alternating minimnization.
 
-        Args:
-            sample_weight: numpy array, N x 1, weight of each sample
-            X: numpy array, N x D, features
-            Y: numpy array, N x K, responses
+        Parameters
+        ----------
+            sample_weight: numpy array
+                N x 1, weight of each sample
+            X: numpy array
+                N x D, features
+            Y: numpy array
+                N x K, responses
 
-        Returns:
-            obj: list of objectives in every iterations
+        Returns
+        -------
+            obj: list of float
+                objectives in every iterations
 
         """
         # parameter
@@ -135,21 +149,35 @@ class mrots:
         """
         Calculate objective given estimates at current iteration.
 
-        Args:
-            X: numpy array, N x D, features
-            Y: numpy array, N x K, responses
-            omega: numpy array, K x K, conditional covariance among responeses
-            omega_i: numpy array, K x K, inverse of omega
-            sigma: numpy array, K x K, covariance among tasks' coefficients
-            sigma_i: numpy array, K x K, inverse of sigma
-            W: numpy array, D x K, coefficents of tasks
-            b: numpy array, K x 1, intercepts of tasks
-            N: integer, sample size
-            D: integer, dimension of features
-            sample_weight: numpy array, N x 1, weight of each sample
+        Parameters
+        ----------
+            X: numpy array
+                N x D, features
+            Y: numpy array
+                N x K, responses
+            omega: numpy array
+                K x K, conditional covariance among responeses
+            omega_i: numpy array
+                K x K, inverse of omega
+            sigma: numpy array
+                K x K, covariance among tasks' coefficients
+            sigma_i: numpy array
+                K x K, inverse of sigma
+            W: numpy array
+                D x K, coefficients of tasks
+            b: numpy array
+                K x 1, intercepts of tasks
+            N: integer
+                sample size
+            D: integer
+                dimension of features
+            sample_weight: numpy array
+                N x 1, weight of each sample
 
-        Returns:
-            _obj: float, objective of current iteration
+        Returns
+        -------
+            _obj: float
+                objective of current iteration
         """
 
         H = np.diag(sample_weight)
@@ -166,24 +194,37 @@ class mrots:
                  D, K, sample_weight=None):
 
         """
-        Update coefficents. Two implementations: 1) svd (Cai, 2014), slow for big sample size;
-        assume N>D, N>K 2) linear system (Rai, 2012), require large memory for large D & K (DK x DK matrix)
+        Update coefficients. Two implementations: 1) svd (Cai, 2014) assume N>D, N>K \
+        2) linear system (Rai, 2012), require large memory for large D & K (DK x DK matrix)
         Here we implemented 2).
 
-        Args:
-            X: numpy array, N x D, features
-            Y: numpy array, N x K, responses
-            omega: numpy array, K x K, conditional covariance among responeses
-            omega_i: numpy array, K x K, inverse of omega
-            sigma: numpy array, K x K, covariance among tasks' coefficients
-            sigma_i: numpy array, K x K, inverse of sigma
-            b: numpy array, K x 1, intercepts of tasks
-            D: integer, dimension of features
-            K: integer, dimension of tasks/responses
-            sample_weight: numpy array, N x 1, weight of each sample
+        Parameters
+        ----------
+            X: numpy array
+                N x D, features
+            Y: numpy array
+                N x K, responses
+            omega: numpy array
+                K x K, conditional covariance among responeses
+            omega_i: numpy array
+                K x K, inverse of omega
+            sigma: numpy array
+                K x K, covariance among tasks' coefficients
+            sigma_i: numpy array
+                K x K, inverse of sigma
+            b: numpy array
+                K x 1, intercepts of tasks
+            D: integer
+                dimension of features
+            K: integer
+                dimension of tasks/responses
+            sample_weight: numpy array
+                N x 1, weight of each sample
 
-        Returns:
-            W: numpy array, D x K, coefficents of tasks
+        Returns
+        -------
+            W: numpy array
+                D x K, coefficients of tasks
 
         """
         H = np.diag(sample_weight)
@@ -200,13 +241,20 @@ class mrots:
         """
         Update intercepts.
 
-        Args:
-            X: numpy array, N x D, features
-            Y: numpy array, N x K, responses
-            W: numpy array, D x K, coefficents of tasks
-            sample_weight: numpy array, N x 1, weight of each sample
-        Return:
-            b: K x 1, intercepts
+        Parameters
+        ----------
+            X: numpy array
+                N x D, features
+            Y: numpy array
+                N x K, responses
+            W: numpy array
+                D x K, coefficients of tasks
+            sample_weight: numpy array
+                N x 1, weight of each sample
+        Returns
+        -------
+            b: numpy array
+                K x 1, intercepts
         """
         _sum = (Y - X @ W).T @ sample_weight[:, None]
         _weighted_mean = _sum / np.sum(sample_weight)
@@ -221,18 +269,29 @@ class mrots:
         Note that this option sometimes encounter warning related to PSD from
         the graphical lasso implementation.
 
-        Args:
-            X: numpy array, N x D, features
-            Y: numpy array, N x K, responses
-            W: numpy array, D x K, coefficents of tasks
-            b: numpy array, K x 1, intercepts of tasks
-            N: integer, sample size
-            K: integer, dimension of tasks/responses
-            sample_weight: numpy array, N x 1, weight of each sample
+        Parameters
+        ----------
+            X: numpy array
+                N x D, features
+            Y: numpy array
+                N x K, responses
+            W: numpy array
+                D x K, coefficients of tasks
+            b: numpy array
+                K x 1, intercepts of tasks
+            N: integer
+                sample size
+            K: integer
+                dimension of tasks/responses
+            sample_weight: numpy array
+                N x 1, weight of each sample
 
-        Returns:
-            omega: numpy array, K x K, conditional covariance among responeses
-            omega_i: numpy array, K x K, inverse of omega
+        Returns
+        -------
+            omega: numpy array
+                K x K, conditional covariance among responeses
+            omega_i: numpy array
+                K x K, inverse of omega
 
         """
         _dif = Y - X @ W - b
@@ -250,14 +309,21 @@ class mrots:
         """
         Update covariance matrix among tasks' coefficients.
 
-        Args:
-            W: numpy array, D x K, coefficents of tasks
-            D: integer, dimension of features
-            K: integer, dimension of tasks/responses
+        Parameters
+        ----------
+            W: numpy array
+                D x K, coefficients of tasks
+            D: integer
+                dimension of features
+            K: integer
+                dimension of tasks/responses
 
-        Returns:
-            sigma: numpy array, K x K, covariance among tasks' coefficients
-            sigma_i: numpy array, K x K, inverse of sigma
+        Returns
+        -------
+            sigma: numpy array
+                K x K, covariance among tasks' coefficients
+            sigma_i: numpy array
+                K x K, inverse of sigma
 
         """
         _prod = W.T @ W
@@ -271,11 +337,15 @@ class mrots:
         """
         Linear predictor with learned W and b.
 
-        Args:
-            X: numpy array, N x D, features
+        Parameters
+        ----------
+            X: numpy array
+                N x D, features
 
-        Returns:
-            _pre: numpy array, N x K, predictions
+        Returns
+        -------
+            _pre: numpy array
+                N x K, predictions
 
         """
         _pre = X @ self.W + self.b
@@ -284,17 +354,24 @@ class mrots:
     def get_likelihood(self, Y_hat, Y, K, idx_variable=None, conditional=False):
         """
         Calculate likelihood for all responses; or part of responses conditional
-        on the other part of responses with learned parameter.
+        on the other part of responses using learned parameter.
 
-        Args:
-            Y_hat: numpy array, N x K, predicted values given by the mean
-            Y: numpy array, N x K, responses
-            K: integer, dimension of tasks/responses
-            idx_variable:  list of integers, index of response variables that are conditional on
-            conditional: boolean, if calculate conditional likelihood
+        Parameters
+        ----------
+            Y_hat: numpy array
+                N x K, predicted values given by the mean
+            Y: numpy array
+                N x K, responses
+            K: integer
+                dimension of tasks/responses
+            idx_variable:  list of integers
+                index of response variables that are conditional on
+            conditional: boolean
+                if calculate conditional likelihood
 
-        Returns:
-            list of likelihoods for every sample
+        Returns
+        -------
+            likelihoods for every sample: list of float
         """
 
         # take the predicted values as the learned mean
