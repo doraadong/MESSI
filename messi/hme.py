@@ -14,46 +14,62 @@ from messi.utils import *
 
 class hme:
     """
+    Implementation of hierachical mixture model (Jordan & Jocab,1994) with various
+    options for gates and experts.
 
-     Implementation of hierachical mixture model (Jordan & Jocab,1994) with various
-        options for gates and experts.
-
-        5/3/20:
+    5/3/20:
         a. gates are 'hard', learning on labels (instead of soft as in (Jordan & Jocab,1994))
         b. stopping criterion
             1. based on training set; instead of validation set
             2. based on errors instead of objective Q(,)
-        c. in training, if no sample assigned to a class then the class will be removed
+        c. during training, if no sample assigned to a class then the class will be removed
 
+    Parameters
+    ----------
+        n_classes_0: integer
+            number of classes for the 1st layer; set as 1 if only allow 1 layer
+        n_classes_1: integer
+            number of classes for the 2nd layer; equal to number of experts if only allow 1 layer
+        model_name_gates: string
+            model for the classifiers/gates; any of "decision_tree", "logistic"
+        model_name_experts: string
+            model for the experts; any of "mrots", "lasso" or "linear".
+        num_responses: integer
+            number of response variables
+        group_by_likelihood: boolean
+            if samples assigned to experts by likelihood; default true
+        idx_conditioned: list of integers
+            index of response variables that are conditional on for likelihood; default none
+        conditional: boolean
+            if likelihood is conditional or not; default false
+        init_labels_0: list of integers
+            cluster labels (starting from 0) for level 1, N x 1, initialized grouping of samples; default none
+        init_labels_1: list of list of integers
+            cluster labels (starting from 0) for level 2, initialized grouping of samples; default none
+        soft_weights: boolean
+            if apply soft grouping of samples; default true
+        partial_fit_gate: boolean
+            run for 1 epoch only, using all training samples; default false
+        partial_fit_expert: boolean
+            run for 1 epoch only, using all training samples; default false
+        tolerance: integer
+            number of epochs to run after reaching the best epoch before stopping; default 3
+        n_epochs: integer
+            total number of epochs; default 20
+        random_state: integer
+            random state applying to numpy.random.choice or experts/classifiers
+
+    Raises
+    ------
+        NotImplementedError
+            some experts or gates models are not supported
     """
 
     def __init__(self, n_classes_0, n_classes_1, model_name_gates, model_name_experts, num_responses,
                  group_by_likelihood=True, idx_conditioned=None, conditional=False, init_labels_0=None,
                  init_labels_1=None, soft_weights=True, partial_fit_gate=False, partial_fit_expert=False,
                  tolerance=3, n_epochs=20, random_state=222):
-        """
 
-        Args:
-            n_classes_0: integer, number of classes for the 1st layer; set as 1 if only allow 1 layer
-            n_classes_1: integer, number of classes for the 2nd layer; equal to number of experts if only allow 1 layer
-            model_name_gates: string, model for the classifiers/gates; any of "decision_tree", "logistic"
-            model_name_experts: string, model for the experts; any of "mrots", "lasso" or "linear".
-            num_responses: integer, number of response variables
-            group_by_likelihood: boolean, if samples assigned to experts by likelihood; default true
-            idx_conditioned: list of integers, index of response variables that are conditional for likelihood; default none
-            conditional: boolean, if likelihood is conditional or not; default false
-            init_labels_0: list of integers, cluster labels (starting from 0) for level 1, N x 1, initialized grouping of samples; default none
-            init_labels_1: list of list of integers, cluster labels (starting from 0) for level 2, initialized grouping of samples; default none
-            soft_weights: boolean, if apply soft grouping of samples; default true
-            partial_fit_gate: boolean, run for 1 epoch only, using all training samples; default false
-            partial_fit_expert: boolean, run for 1 epoch only, using all training samples; default false
-            tolerance: integer, number of epochs to run after reaching the best epoch before stopping; default 3
-            n_epochs: integer, total number of epochs; default 20
-            random_state: integer, random state applying to numpy.random.choice or experts/classifiers
-
-        Raises:
-            NotImplementedError: some experts or gates models are not supported
-        """
 
         self.n_classes_0 = n_classes_0
         self.n_classes_1 = n_classes_1
@@ -162,17 +178,26 @@ class hme:
 
         Train a single gate/classifier.
 
-        Args:
-            model: object from a model class
-            idx_subset: list of integers, indexes of samples that are assigned to this gate (and used for training)
-            labels: list of integers, labels of this subset of samples
-            X_train_clf: numpy array, sample size x feature size, features for the gate
-            current_classes: list of integers, unique labels of non-empty classes
+        Parameters
+        ----------
+            model: object
+                an instance of a model class
+            idx_subset: list of integers
+                indexes of samples that are assigned to this gate (and used for training)
+            labels: list of integers
+                labels of this subset of samples
+            X_train_clf: numpy array
+                sample size x feature size, features for the gate
+            current_classes: list of integers
+                unique labels of non-empty classes
 
-        Returns:
-            probs: numpy array, (total) sample size x number of classes, predicted probability of samples assigned \
+        Returns
+        -------
+            probs: numpy array
+                (total) sample size x number of classes, predicted probability of samples assigned \
             to different classes
-            errors: float, cross-entropy error on this subset of training samples
+            errors: float
+                cross-entropy error on this subset of training samples
 
         """
         # get subset data for training
@@ -204,19 +229,30 @@ class hme:
 
         Train a single expert.
 
-        Args:
-            model: object or a list of objects (if MultiTask = false) from a model class
-            idx_subset: list of integers, indexes of samples that are assigned to this expert (and used for training)
-            Y_train: numpy array, sample size x number of responses, response variables
-            X_train: numpy array, sample size x feature size, features for experts
-            weight: numpy array, sample size x 1, sample weights for this expert
-            MultiTask: boolean, if the expert is multi-task
+        Parameters
+        ----------
+            model: object or a list of objects (if MultiTask = false)
+                an instance of a model class
+            idx_subset: list of integers
+                indexes of samples that are assigned to this expert (and used for training)
+            Y_train: numpy array
+                sample size x number of responses, response variables
+            X_train: numpy array
+                sample size x feature size, features for experts
+            weight: numpy array
+                sample size x 1, sample weights for this expert
+            MultiTask: boolean
+                if the expert is multi-task
 
-        Returns:
-            Y_hat: numpy array, (total) sample size x number of responses, predictions from this expert
-            errors: float, (unweighted) mean square error on the assigned training samples
+        Returns
+        -------
+            Y_hat: numpy array
+                (total) sample size x number of responses, predictions from this expert
+            errors: float
+                (unweighted) mean square error on the assigned training samples
 
-        Raises:
+        Raises
+        ------
             TypeError: if the expert model does not support sample_weight keyword
 
         """
@@ -281,12 +317,17 @@ class hme:
         """
         Transform mean square error into a 'probability' form. (Not real probability)
 
-        Args:
-            errors: numpy array, sample size x number of experts, mean square errors
-            dist_type: string, type of distribution; default none
+        Parameters
+        ----------
+            errors: numpy array
+                sample size x number of experts, mean square errors
+            dist_type: string
+                type of distribution; default none
 
-        Returns:
-            errors_probs: umpy array, sample size x number of experts, transformed errors
+        Returns
+        -------
+            errors_probs: numpy array
+                sample size x number of experts, transformed errors
 
         """
         if dist_type is None:
@@ -300,15 +341,20 @@ class hme:
         """
 
         Calculate the joint probability of classes across 2 levels (equal to the probability of experts).
-        That is: p(level 1 = i, level 2 = j| x) = p(expert = z | x)
+        That is: p(level 1 = i, level 2 = j| x) = p(expert = z | x) if (expert = z) = (level 1 = i, level 2 = j)
 
-        Args:
-            gate_probs_0: numpy array, sample size x number of level 1 classes, level 1 gate outputs
-            gate_probs_1: list of numpy arrays, each containing an array of sample size x number of \
+        Parameters
+        ----------
+            gate_probs_0: numpy array
+                sample size x number of level 1 classes, level 1 gate outputs
+            gate_probs_1: list of numpy arrays
+                each containing an array of sample size x number of \
             level 2 classes corresponding to the outputs from a level 2 gate
 
-        Return:
-            gate_probs: numpy array, sample size x number of experts
+        Returns
+        -------
+            gate_probs: numpy array
+                sample size x number of experts
         """
 
         # if multiple classes exist for level 1
@@ -343,15 +389,23 @@ class hme:
         Calculate the posterior probability/weight of experts as the product of likelihood and expert probability.
         That is: p(expert = z | x, y) = p(y | expert = z, x) * p(expert = z | x) / p(y | x)
 
-        Args:
-            gate_probs: numpy array, sample size x number of experts, joint probability of classes given features
-            expert_probs: numpy array, sample size x number of experts, sample likelihood of each expert
-            cur_iter: integer, current epoch
-            iter_start_gate: integer, before which use only expert likelihood to approximate the weight; default 0
-            normalize: boolean, if normalize by p(y | x) or not, default true
+        Parameters
+        ----------
+            gate_probs: numpy array
+                sample size x number of experts, joint probability of classes given features
+            expert_probs: numpy array
+                sample size x number of experts, sample likelihood of each expert
+            cur_iter: integer
+                current epoch
+            iter_start_gate: integer
+                before which use only expert likelihood to approximate the weight; default 0
+            normalize: boolean
+                if normalize by p(y | x) or not, default true
 
-        Returns:
-            posterior weights of experts (normalized or not), numpy array, sample size x number of experts
+        Returns
+        -------
+            posterior weights of experts: numpy array
+                sample size x number of experts
 
         """
 
@@ -379,13 +433,18 @@ class hme:
         Map classes at different levels with the index of experts (with index 0,1,2,...)
         based on a set of available (non-empty) classes at different levels.
 
-        Args:
-            current_classes: list of list of integers, each sub-list corresponnds to a gate, containing unique labels \
+        Parameters
+        ----------
+            current_classes: list of list of integers
+                each sub-list corresponnds to a gate, containing unique labels \
             of non-empty classes
 
-        Returns:
-            level_0_for_expert: list of integers, the class at level 1 for an expert
-            level_1_for_expert: list of integers, the class at level 2 for an expert
+        Returns
+        -------
+            level_0_for_expert: list of integers
+                the class at level 1 for an expert
+            level_1_for_expert: list of integers
+                the class at level 2 for an expert
 
         """
         # map level 1 classes to each expert
@@ -397,7 +456,7 @@ class hme:
         _temp = [current_classes[i + 1] for i in range(len(current_classes[0]))]
         level_1_for_expert = flatten(_temp)
 
-        # both equal to the current number of experts
+        # lengths (number of current experts) should be equal
         assert len(level_0_for_expert) == len(level_1_for_expert)
 
         return level_0_for_expert, level_1_for_expert
@@ -405,22 +464,28 @@ class hme:
     def assign_labels(self, expectations, current_classes):
         """
 
-        Re-assign labels for all levels of classes to samples based on estimated weights of experts.
+        Re-assign labels for all levels of classifiers to samples based on estimated weights of experts.
         Note this is different from the original algorithm in (Jordan & Jocab,1994) where they use
         directly the weights to fit gates. Here we assume that the expert with highest weight (say expert j)
         takes all probability mass (i.e. p(expert = j | y, x) = 1 and p(expert = others | y, x) = 0).
-        Then, for example, if (expert = 2) = (level 1 = 0, level 2 = 2); the class at level 2
-        for this sample is 2 and the class at level 1 for this sample is 0.  In this way,
+        Then, for example, if (expert = 2) = (level 1 = 0, level 2 = 2); the class label at level 2
+        for this sample is 2 and the class label at level 1 for this sample is 0.  In this way,
         we can fit gates with labels (thus hard classification).
 
-        Args:
-            expectations: numpy array, sample size x number of experts, weights of experts
-            current_classes: list of list of integers, each sub-list corresponnds to a gate, containing unique labels \
+        Parameters
+        ----------
+            expectations: numpy array
+                sample size x number of experts, weights of experts
+            current_classes: list of list of integers
+                each sub-list corresponnds to a gate, containing unique labels \
             of non-empty classes
 
-        Returns:
-            labels_0: list of labels (0,1,..), N x 1, new labels based on learned expectations for level 1
-            labels_1: list of list of labels (0,1,..), each sub-list for each level 2 gate, \
+        Returns
+        -------
+            labels_0: list of integers
+                N x 1, new labels based on learned expectations for level 1
+            labels_1: list of list of integers
+                each sub-list for each level 2 gate, \
             new labels based on learned expectations for level 2
 
         """
@@ -457,13 +522,16 @@ class hme:
     def get_current_classes(self):
         """
 
-        Update non-empty classes (in ascending order) for each layer, based on newly assigned labels inferred from the
+        Update non-empty class labels (in ascending order) for each layer, based on newly assigned labels inferred from the
         posterior weights of experts.
 
-        Returns:
-            current_classes: list of list of integers, each sub-list corresponnds to a gate, containing unique labels \
+        Returns
+        -------
+            current_classes: list of list of integers
+                each sub-list corresponnds to a gate, containing unique labels \
             of non-empty classes
-            n_experts: integer, number of experts based on available classes
+            n_experts: integer
+                number of experts based on available classes
 
         """
         current_classes = []
@@ -489,13 +557,18 @@ class hme:
 
         Map sample index to the classes they were assigned to at different levels.
 
-        Args:
-            current_classes: list of list of integers, each sub-list corresponnds to a gate, containing unique labels \
+        Parameters
+        ----------
+            current_classes: list of list of integers
+                each sub-list corresponnds to a gate, containing unique labels \
             of non-empty classes
 
-        Returns:
-            idx_0: list of list of integers, each sub-list corresponds to the samples assigned to a class at level 1
-            idx_1: list of list of integers, each sub-list corresponds to the samples assigned to a class at level 2
+        Returns
+        -------
+            idx_0: list of list of integers
+                each sub-list corresponds to the samples assigned to a class at level 1
+            idx_1: list of list of integers
+                each sub-list corresponds to the samples assigned to a class at level 2
 
         """
 
@@ -528,14 +601,21 @@ class hme:
         """
         Train gates and experts based on EM.
 
-        Args:
-            X_train: numpy array, sample size x feature size, features for experts
-            X_train_clf_1: numpy array, sample size x feature size, features for the 1st layer gate
-            X_train_clf_2: numpy array, sample size x feature size, features for the 2nd layer gates
-            Y_train: numpy array, sample size x number of responses, response variables
+        Parameters
+        ----------
+            X_train: numpy array
+                sample size x feature size, features for experts
+            X_train_clf_1: numpy array
+                sample size x feature size, features for the 1st layer gate
+            X_train_clf_2: numpy array
+                sample size x feature size, features for the 2nd layer gates
+            Y_train: numpy array
+                sample size x number of responses, response variables
 
-        Raises:
-            NotImplementedError: some experts or gates models are not supported
+        Raises
+        ------
+            NotImplementedError
+                some experts or gates models are not supported
 
         """
 
@@ -732,16 +812,24 @@ class hme:
         """
         Make predictions on test data.
 
-        Args:
-            X_test: numpy array, sample size x feature size, features for experts
-            X_test_clf_1: numpy array, sample size x feature size, features for the 1st layer gate
-            X_test_clf_2: numpy array, sample size x feature size, features for the 2nd layer gates
+        Parameters
+        ----------
+            X_test: numpy array
+                sample size x feature size, features for experts
+            X_test_clf_1: numpy array
+                sample size x feature size, features for the 1st layer gate
+            X_test_clf_2: numpy array
+                sample size x feature size, features for the 2nd layer gates
 
-        Returns:
-            Y_hat_final: numpy array, sample size x number of responses, predictions
+        Returns
+        -------
+            Y_hat_final: numpy array
+                sample size x number of responses, predictions
 
-        Raises:
-            NotImplementedError: some experts or gates models are not supported
+        Raises
+        ------
+            NotImplementedError
+                some experts or gates models are not supported
 
         """
         # ------ setting parameters ------
