@@ -17,7 +17,8 @@ REQUIRES_PYTHON = '>=3.6'
 VERSION = '1.0.0'
 
 # What packages are required for this module to be executed?
-REQUIRED = ['scipy>=1.3.0', 'numpy>=1.16.3', 'scikit-learn>=0.22.1', 'pandas>=0.25.3']
+REQUIRED = ['scipy>=1.3.0', 'numpy>=1.16.3', 'scikit-learn>=0.22.1', 'pandas>=0.25.3',
+            "importlib_resources ; python_version<'3.7'"]
 
 # The rest you shouldn't have to touch too much :)
 # ------------------------------------------------
@@ -54,7 +55,8 @@ setup(
     python_requires=REQUIRES_PYTHON,
     url=URL,
     packages=['messi'],
-    package_data={'messi': ['input/ligand_receptor_pairs2.txt']},
+    package_data={'messi': ['method_diagram.png','input/ligand_receptor_pairs2.txt']},
+    scripts=['readyData.py'],
     entry_points={'console_scripts': ['messi=messi.messi:main']},
     install_requires=REQUIRED,
     include_package_data=True,
