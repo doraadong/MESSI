@@ -56,7 +56,6 @@ setup(
     url=URL,
     packages=['messi'],
     package_data={'messi': ['method_diagram.png','input/ligand_receptor_pairs2.txt']},
-    scripts=['readyData.py'],
     entry_points={'console_scripts': ['messi=messi.messi:main']},
     install_requires=REQUIRED,
     include_package_data=True,
