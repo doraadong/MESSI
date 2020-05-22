@@ -17,8 +17,7 @@ REQUIRES_PYTHON = '>=3.6'
 VERSION = '1.0.0'
 
 # What packages are required for this module to be executed?
-REQUIRED = ['scipy>=1.3.0', 'numpy>=1.16.3', 'scikit-learn>=0.22.1', 'pandas>=0.25.3',
-            "importlib_resources ; python_version<'3.7'"]
+REQUIRED = ['scipy>=1.3.0', 'numpy>=1.16.3', 'scikit-learn>=0.22.1', 'pandas>=0.25.3']
 
 # The rest you shouldn't have to touch too much :)
 # ------------------------------------------------
