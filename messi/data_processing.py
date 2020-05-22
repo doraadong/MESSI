@@ -15,9 +15,6 @@ except ImportError:
     # Try backported to PY<37 `importlib_resources`.
     import importlib_resources as pkg_resources
 
-DATA_PATH = pkg_resources.resource_filename('messi', 'input/')
-# DB_FILE = pkg_resources.resource_filename('messi', 'input/ligand_receptor_pairs2.txt')
-
 import numpy as np
 import pandas as pd
 from scipy.spatial import Delaunay
@@ -29,7 +26,7 @@ from sklearn.preprocessing import PolynomialFeatures
 # ------ read data ------
 
 # tool data
-def get_lr_pairs(filename = 'ligand_receptor_pairs2.txt', input_path = DATA_PATH):
+def get_lr_pairs(filename = 'ligand_receptor_pairs2.txt', input_path = 'input/'):
     """
     Process and read in the ligand and receptor list.
 
@@ -46,7 +43,9 @@ def get_lr_pairs(filename = 'ligand_receptor_pairs2.txt', input_path = DATA_PATH
         r_u: set of receptors
 
     """
-    lr_pairs = pd.read_table(os.path.join(input_path, filename), header = None)
+    # lr_pairs = pd.read_table(os.path.join(input_path, filename), header = None)
+    temp = pkg_resources.read_text(messi.input, 'ligand_receptor_pairs2.txt')
+    print(temp)
     lr_pairs.columns = ['ligand','receptor']
     lr_pairs['ligand'] = lr_pairs['ligand'].apply(lambda x: x.upper())
     lr_pairs['receptor'] = lr_pairs['receptor'].apply(lambda x: x.upper())
