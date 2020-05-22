@@ -30,10 +30,10 @@ def main():
     # parse command-line arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', required=True,
-                        default='../input/', help="string, path to the input folder with the expression data, "
-                                                  "default '../input/'")
+                        default='input/', help="string, path to the input folder with the expression data, "
+                                                  "default 'input/'")
     parser.add_argument('-o', '--output', required=True,
-                        default='../output/', help="string, path to the output folder, default '../output/'")
+                        default='output/', help="string, path to the output folder, default 'output/'")
     parser.add_argument('-d', '--dataType', required=True,
                         default='merfish', help="string, type of expression data, default 'merfish'")
     parser.add_argument('-g', '--gender', required=True,
