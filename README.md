@@ -19,8 +19,40 @@ MESSI (**M**ixture of **E**xperts for **S**patial **S**ignaling genes **I**denti
 
 ## Installation 
 
+It is recommended to use a virtural environment/pacakges manager such as [Anaconda](https://www.anaconda.com/). After successfully installing Anaconda/Miniconda, create an environment by following: 
+
 ```shell
-sudo pip3 install --upgrade  https://github.com/doraadong/MESSI/tarball/master
+conda create -n myenv python=3.6
+```
+
+You can then install and run the package in the virtual environment. Activate the virtural environment by: 
+
+```shell
+conda activate myenv
+```
+
+Make sure you have **pip** installed in your environment. You may check by 
+
+```shell
+conda list
+```
+
+Then install MESSI, together with all its dependencies by: 
+
+```shell
+pip install --upgrade  https://github.com/doraadong/MESSI/tarball/master
+```
+
+If you prefer not to use a virtual envrionment, then you may install MESSI and its dependencies by (may need to use **sudo**): 
+
+```shell
+pip3 install --upgrade  https://github.com/doraadong/MESSI/tarball/master
+```
+
+You may find where the package is installed by:
+ 
+```shell
+pip show messi
 ```
 
 # Command-line usage 
