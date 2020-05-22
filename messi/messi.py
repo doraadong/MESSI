@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 Train and test MESSI model on an expression dataset.
 
