@@ -44,7 +44,7 @@ def get_lr_pairs(filename = 'ligand_receptor_pairs2.txt', input_path = 'input/')
 
     """
     # lr_pairs = pd.read_table(os.path.join(input_path, filename), header = None)
-    temp = pkg_resources.read_text(messi.input, 'ligand_receptor_pairs2.txt')
+    temp = pkg_resources.read_text(input, 'ligand_receptor_pairs2.txt')
     print(temp)
     lr_pairs.columns = ['ligand','receptor']
     lr_pairs['ligand'] = lr_pairs['ligand'].apply(lambda x: x.upper())
