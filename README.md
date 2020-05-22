@@ -69,14 +69,12 @@ pip show messi
 
 ## Download helper data & expression data and convert them to required formats:
 
-Download the script [messi/readyData.py](messi/readyData.py). 
-
-Execute this python script by (arguments are taken for example): 
+In terminal, type (arguments are taken for example): 
 
 ```shell
-python readyData.py -i ../input/ -d merfish
+readyData.py -i ../input/ -d merfish
 ```
-The usage of this file is listed as follows:  
+The usage of this script is listed as follows:  
 
 ```shell
 usage: readyData.py [-h] -i INPUT -d DATATYPE
