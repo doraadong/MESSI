@@ -7,7 +7,6 @@ neighbors and to prepare features and response variables.
 
 """
 
-
 import os
 
 
@@ -728,7 +727,7 @@ def prepare_features(data_type, datasets_train, datasets_test, meta_per_dataset_
         # filter regulators neighbor
         dispersion = X_trains['regulators_neighbor_self'].var(axis=0) / (
                     X_trains['regulators_neighbor_self'].mean(axis=0) + 1e-6)
-        idx_filtered = np.Parametersort(-dispersion, axis=0)[:top_k_regulator]
+        idx_filtered = np.argsort(-dispersion, axis=0)[:top_k_regulator]
         for key in ['regulators_neighbor', 'regulators_neighbor_self']:
             if X_trains[key] is not None:
                 X_trains[key] = X_trains[key][:, idx_filtered]
@@ -737,7 +736,7 @@ def prepare_features(data_type, datasets_train, datasets_test, meta_per_dataset_
 
         # filter regulators self
         dispersion = X_trains['regulators_self'].var(axis=0) / (X_trains['regulators_self'].mean(axis=0) + 1e-6)
-        idx_filtered = np.Parametersort(-dispersion, axis=0)[:top_k_regulator]
+        idx_filtered = np.argsort(-dispersion, axis=0)[:top_k_regulator]
         X_trains['regulators_self'] = X_trains['regulators_self'][:, idx_filtered]
         X_tests['regulators_self'] = X_tests['regulators_self'][:, idx_filtered]
         regulator_list_self = list(np.array(regulator_list_self)[idx_filtered])
@@ -1317,7 +1316,7 @@ def prepare_responses(data_type, datasets_train, datasets_test, idx_train_in_gen
     if top_k_response is not None:
         dispersion = Y_train.var(axis=0) / (Y_train.mean(axis=0) + 1e-6)
 
-        idx_filtered = np.Parametersort(-dispersion, axis=0)[:top_k_response]
+        idx_filtered = np.argsort(-dispersion, axis=0)[:top_k_response]
         Y_train = Y_train[:, idx_filtered]
         Y_train_true = Y_train_true[:, idx_filtered]
         if np.ndim(Y_test) > 1:
