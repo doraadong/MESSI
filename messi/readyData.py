@@ -127,7 +127,7 @@ def main():
         print(f"{os.path.join(input_path, filename)} alrady exists. No need downloading.")
     else:
         print(f"Downloading ligand/receptor list to {os.path.join(input_path, filename)}")
-        with urllib.request.urlopen(url) as response, open(filename, 'wb') as out_file:
+        with urllib.request.urlopen(url) as response, open(os.path.join(input_path, filename), 'wb') as out_file:
             shutil.copyfileobj(response, out_file)
 
     # set parameters specific to the data type
@@ -143,7 +143,7 @@ def main():
         print(f"{os.path.join(input_path, filename)} alrady exists. No need downloading.")
     else:
         print(f"Downloading expression data to {os.path.join(input_path, filename)}")
-        with urllib.request.urlopen(url) as response, open(filename, 'wb') as out_file:
+        with urllib.request.urlopen(url) as response, open(os.path.join(input_path, filename), 'wb') as out_file:
             shutil.copyfileobj(response, out_file)
 
     # process data
