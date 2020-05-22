@@ -19,6 +19,8 @@ MESSI (**M**ixture of **E**xperts for **S**patial **S**ignaling genes **I**denti
 
 ## Installation 
 
+### Install within a virtual environment 
+
 It is recommended to use a virtural environment/pacakges manager such as [Anaconda](https://www.anaconda.com/). After successfully installing Anaconda/Miniconda, create an environment by following: 
 
 ```shell
@@ -35,6 +37,12 @@ Make sure you have **pip** installed in your environment. You may check by
 
 ```shell
 conda list
+```
+
+If not installed, then: 
+
+```shell
+conda install pip
 ```
 
 Then install MESSI, together with all its dependencies by: 
