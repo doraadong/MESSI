@@ -51,6 +51,8 @@ Then install MESSI, together with all its dependencies by:
 pip install --upgrade  https://github.com/doraadong/MESSI/tarball/master
 ```
 
+### Not using virtural environment
+
 If you prefer not to use a virtual envrionment, then you may install MESSI and its dependencies by (may need to use **sudo**): 
 
 ```shell
