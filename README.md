@@ -5,7 +5,7 @@ MESSI (**M**ixture of **E**xperts for **S**patial **S**ignaling genes **I**denti
 
 ## Table of Contents
 - [Get started](#Get&nbsp;started)
-- [Command-line usage](#Command-line&nbsp;usage )
+- [Command-line](#Command-line)
 - [Tutorials](#Tutorials)
 
 # Get started 
@@ -65,7 +65,7 @@ You may find where the package is installed by:
 pip show messi
 ```
 
-# Command-line usage 
+# Command-line 
 
 ## Download helper data & expression data and convert them to required formats:
 
