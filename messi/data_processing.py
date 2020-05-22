@@ -7,13 +7,9 @@ neighbors and to prepare features and response variables.
 
 """
 
+
 import os
 
-try:
-    import importlib.resources as pkg_resources
-except ImportError:
-    # Try backported to PY<37 `importlib_resources`.
-    import importlib_resources as pkg_resources
 
 import numpy as np
 import pandas as pd
@@ -43,9 +39,7 @@ def get_lr_pairs(filename = 'ligand_receptor_pairs2.txt', input_path = 'input/')
         r_u: set of receptors
 
     """
-    # lr_pairs = pd.read_table(os.path.join(input_path, filename), header = None)
-    temp = pkg_resources.read_text(input, 'ligand_receptor_pairs2.txt')
-    print(temp)
+    lr_pairs = pd.read_table(os.path.join(input_path, filename), header=None)
     lr_pairs.columns = ['ligand','receptor']
     lr_pairs['ligand'] = lr_pairs['ligand'].apply(lambda x: x.upper())
     lr_pairs['receptor'] = lr_pairs['receptor'].apply(lambda x: x.upper())
