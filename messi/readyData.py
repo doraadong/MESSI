@@ -1,7 +1,9 @@
 """
-Download and preprocess an expression dataset.
+Download and preprocess a helper dataset and an expression dataset.
 
-For a particular type of data, the script first downloads it at ta user-defined folder. It then preprocess
+The script will first download the ligand and receptor list.
+
+Then, for a particular type of expression data, the script first downloads it at ta user-defined folder. It then preprocess
 it (by cutting the whole dataset into subsets based on animal/sample ID and other info (e.g., bregma)) and
 produces files with meta informations. All preprocessed files will be saved at the same user-defined folder.
 
@@ -100,8 +102,8 @@ def main():
     # parse command-line arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', required=True,
-                        default='../input/', help="string, path to the folder to save the expression data, "
-                                                  "default '../input/'")
+                        default='input/', help="string, path to the folder to save the expression data, "
+                                                  "default 'input/'")
     parser.add_argument('-d', '--dataType', required=True,
                         default='merfish', help="string, type of expression data, default 'merfish'")
 
@@ -112,6 +114,22 @@ def main():
     input_path = args.input
     data_type = args.dataType
 
+    # create folder to save data
+    if not os.path.exists(input_path):
+        os.makedirs(input_path)
+
+    # set parameters for downloading the helper data
+    url = "https://github.com/doraadong/MESSI/blob/master/messi/input/ligand_receptor_pairs2.txt"
+
+    # download data
+    filename = "ligand_receptor_pairs2.txt"
+    if os.path.exists(os.path.join(input_path, filename)):
+        print(f"{os.path.join(input_path, filename)} alrady exists. No need downloading.")
+    else:
+        print(f"Downloading ligand/receptor list to {os.path.join(input_path, filename)}")
+        with urllib.request.urlopen(url) as response, open(filename, 'wb') as out_file:
+            shutil.copyfileobj(response, out_file)
+
     # set parameters specific to the data type
     if data_type == 'merfish':
         url = "https://datadryad.org/stash/downloads/file_stream/68364"
@@ -119,15 +137,12 @@ def main():
     else:
         raise NotImplementedError(f"Now only support processing MERFISH hypothalamus data.")
 
-    # create folder to save data
-    if not os.path.exists(input_path):
-        os.makedirs(input_path)
-
     # download data
     filename = f"{data_type}_raw.csv"
     if os.path.exists(os.path.join(input_path, filename)):
         print(f"{os.path.join(input_path, filename)} alrady exists. No need downloading.")
     else:
+        print(f"Downloading expression data to {os.path.join(input_path, filename)}")
         with urllib.request.urlopen(url) as response, open(filename, 'wb') as out_file:
             shutil.copyfileobj(response, out_file)
 
