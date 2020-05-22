@@ -67,9 +67,9 @@ pip show messi
 
 # Command-line usage 
 
-## Download expression data and convert it to required formats:
+## Download helper data & expression data and convert them to required formats:
 
-Download the script [utils/readyData.py](utils/readyData.py). 
+Download the script [messi/readyData.py](messi/readyData.py). 
 
 Execute this python script by (arguments are taken for example): 
 
@@ -85,7 +85,7 @@ optional arguments:
   -h, --help            show this help message and exit
   -i INPUT, --input INPUT
                         string, path to the folder to save the expression
-                        data, default '../input/'
+                        data, default 'input/'
   -d DATATYPE, --dataType DATATYPE
                         string, type of expression data, default 'merfish'
 
@@ -110,10 +110,10 @@ optional arguments:
   -h, --help            show this help message and exit
   -i INPUT, --input INPUT
                         string, path to the input folder with the expression
-                        data, default '../input/'
+                        data, default 'input/'
   -o OUTPUT, --output OUTPUT
                         string, path to the output folder, default
-                        '../output/'
+                        'output/'
   -d DATATYPE, --dataType DATATYPE
                         string, type of expression data, default 'merfish'
   -g GENDER, --gender GENDER
