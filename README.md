@@ -5,7 +5,7 @@ MESSI (**M**ixture of **E**xperts for **S**patial **S**ignaling genes **I**denti
 
 ## Table of Contents
 - [Get started](#Get&nbsp;started)
-- [Command-line](#Command-line)
+- [Command-line tools](#Command-line)
 - [Tutorials](#Tutorials)
 
 # Get started 
@@ -67,7 +67,7 @@ pip show messi
 
 # Command-line 
 
-## Download helper data & expression data and convert them to required formats:
+## Download helper data & expression data and convert them to required formats
 
 In terminal, type (arguments are taken for example): 
 
