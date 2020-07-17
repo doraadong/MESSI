@@ -99,8 +99,9 @@ messi -i ../input/ -o ../output/ -d merfish -g Female -b Parenting -c Excitatory
 The usage of this file is listed as follows:  
 
 ```shell
-usage: messi [-h] -i INPUT -o OUTPUT -d DATATYPE -g GENDER -b BEHAVIOR -c
-             CELLTYPE -m MODE -c1 NUMLEVEL1 -c2 NUMLEVEL2 [-e EPOCHS]
+usage: messi [-h] -i INPUT -o OUTPUT -d {merfish,merfish_cell_line,starmap} -g
+             GENDER -b BEHAVIOR -c CELLTYPE -m MODE [-c1 NUMLEVEL1]
+             [-c2 NUMLEVEL2] [-e EPOCHS] [-gs GRID_SEARCH] [-ns N_SETS]
              [-r NUMREPLICATES] [-p PREPROCESS] [-tr TOPKRESPONSES]
              [-ts TOPKSIGNALS]
 
@@ -110,10 +111,12 @@ optional arguments:
                         string, path to the input folder with the expression
                         data, default 'input/'
   -o OUTPUT, --output OUTPUT
-                        string, path to the output folder, default
-                        'output/'
-  -d DATATYPE, --dataType DATATYPE
-                        string, type of expression data, default 'merfish'
+                        string, path to the output folder, default 'output/'
+  -d {merfish,merfish_cell_line,starmap}, --dataType {merfish,merfish_cell_line,starmap}
+                        string, type of expression data, 'merfish' for MERFISH
+                        hypothalamus data, 'merfish_cell_line' for MERFISH U-2
+                        OS cells, 'starmap' for 'STARmap mPFC cells';default
+                        'merfish'
   -g GENDER, --gender GENDER
                         string, gender of input animal sample, default
                         'Female', put 'na' if not available
@@ -138,6 +141,11 @@ optional arguments:
                         integer, number of classes at level 2, default 5
   -e EPOCHS, --epochs EPOCHS
                         integer, number of epochs to train MESSI, default 20
+  -gs GRID_SEARCH, --grid_search GRID_SEARCH
+                        boolean, if conduct grid search for hyper-parameters,
+                        default False
+  -ns N_SETS, --n_sets N_SETS
+                        integer, number of CV sets for grid search, default 3
   -r NUMREPLICATES, --numReplicates NUMREPLICATES
                         integer, optional, number of times to run with same
                         set of parameters, default 1
@@ -147,7 +155,8 @@ optional arguments:
                         them to the cell own features; neighbor_sum: include
                         by addinding to the cell own features; anything
                         without 'neighbor': no neighborhood information will
-                        be used as features, default 'neighbor_cat'
+                        be used as features; 'baseline': only baseline
+                        features; default 'neighbor_cat'
   -tr TOPKRESPONSES, --topKResponses TOPKRESPONSES
                         integer, optional, number of top dispersed responses
                         genes to model,default None (to include all response
@@ -159,7 +168,7 @@ optional arguments:
 ```
 
 # Tutorials
-See [tutorials/MESSI_merfish_hypothalamus.ipynb](tutorials/MESSI_merfish_hypothalamus.ipynb), for a detailed intro on how to 
+See [tutorials/MESSI_merfish_hypothalamus.ipynb](tutorials/tutorial_v2_MERFISH_hypothalamus_with_grid_search.ipynb), for a detailed intro on how to 
   * Train and test a MESSI model
   * Analyze the model parameters to infer cell subtypes differ in signaling genes
   * Train and test the data with other model configurations 
