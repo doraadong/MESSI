@@ -168,7 +168,7 @@ optional arguments:
 ```
 
 # Tutorials
-See [tutorials/MESSI_merfish_hypothalamus.ipynb](tutorials/tutorial_v2_MERFISH_hypothalamus_with_grid_search.ipynb), for a detailed intro on how to 
+See [tutorials/MESSI for MERFISH hypothalamus](tutorials/tutorial_v2_MERFISH_hypothalamus_with_grid_search.ipynb), for a detailed intro on how to 
   * Train and test a MESSI model
   * Analyze the model parameters to infer cell subtypes differ in signaling genes
   * Train and test the data with other model configurations 
