@@ -9,7 +9,7 @@ from messi.utils import *
 
 class mrots:
     """
-    A weighted version of MROTS model based on (Rai, 2012), (Cai, 2014)
+    A weighted version of MROTS model based on [1]_, [2]_
     and Iteratively Reweighted Least Squares (IRLS) algorithm.
 
     Parameters
@@ -27,10 +27,20 @@ class mrots:
             verbose: boolean
                 if print out parameter settings and objective values at each iteration, default false
 
+    References
+    ----------
+    .. [1] Rai, P., Kumar, A., and Daume, H. (2012). Simultaneously leveraging output and task structures for \
+    multiple-output regression. In F. Pereira, C. J. C. Burges, L. Bottou, and K. Q. Weinberger, editors, \
+    Advances in Neural Information Processing Systems 25, pages 3185–3193. Curran Associates, Inc.
+
+    .. [2] Cai, H., Huang, Z., Zhu, X., Zhang, Q., and Li, X. (2014). Multi-output regression with tag correlation \
+    analysis for effective image tagging. In International Conference on Database Systems for Advanced Applications, \
+    pages 31–46. Springer.
+
     """
 
     def __init__(self, lams, no_intercept=False, sparse_omega=False,
-                 warm_start=False, n_iters=20, verbose = False):
+                 warm_start=False, n_iters=20, verbose=False):
 
         self.lam, self.lam1, self.lam2, self.lam3 = lams[0], lams[1], \
                                                     lams[2], lams[3]

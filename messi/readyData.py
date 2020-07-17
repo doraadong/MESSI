@@ -29,7 +29,6 @@ import pandas as pd
 from messi.data_processing import *
 
 
-
 def process_merfish_raw(input_path, raw_filename= 'merfish_raw.csv'):
 
     merfish = pd.read_csv(input_path + raw_filename, header=0)

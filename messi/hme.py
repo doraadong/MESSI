@@ -14,15 +14,9 @@ from messi.utils import *
 
 class hme:
     """
-    Implementation of hierachical mixture model (Jordan & Jocab,1994) with various
+    Implementation of hierachical mixture model [1]_ with various
     options for gates and experts.
 
-    5/3/20:
-        a. gates are 'hard', learning on labels (instead of soft as in (Jordan & Jocab,1994))
-        b. stopping criterion
-            1. based on training set; instead of validation set
-            2. based on errors instead of objective Q(,)
-        c. during training, if no sample assigned to a class then the class will be removed
 
     Parameters
     ----------
@@ -63,6 +57,24 @@ class hme:
     ------
         NotImplementedError
             some experts or gates models are not supported
+
+    Notes
+    -----
+    6/16/20:
+        Multivariate gaussian pdf calculation cannot handle when number of variables > 200;
+        use group_by_likelihood = False instead 
+    5/3/20:
+        a. gates are 'hard', learning on labels (instead of soft as in (Jordan & Jocab,1994))
+        b. stopping criterion
+            1. based on training set; instead of validation set
+            2. based on errors instead of objective Q(,)
+        c. during training, if no sample assigned to a class then the class will be removed
+
+    References
+    ----------
+    .. [1] Jordan, M. I., & Jacobs, R. A. (1994). Hierarchical mixtures of experts and the EM algorithm. \
+    Neural computation, 6(2), 181-214.
+
     """
 
     def __init__(self, n_classes_0, n_classes_1, model_name_gates, model_name_experts, num_responses,
@@ -76,12 +88,12 @@ class hme:
         self.model_name_gates = model_name_gates
         self.model_name_experts = model_name_experts
         self.num_responses = num_responses
-        self.GROUP_BY_LIKELIHOOD = group_by_likelihood
+        self.group_by_likelihood = group_by_likelihood
         self.idx_conditioned = idx_conditioned
         self.conditional = conditional
         self.init_labels_0 = init_labels_0
         self.init_labels_1 = init_labels_1
-        self.soft = soft_weights
+        self.soft_weights = soft_weights
         self.partial_fit_gate = partial_fit_gate
         self.partial_fit_expert = partial_fit_expert
         self.n_epochs = n_epochs
@@ -89,12 +101,36 @@ class hme:
         self.random_state = random_state
         self.MULTITASK = False  # if expert is multi-task; default false
         self.weights = None  # expert weights; used in training
-        self.labels_0 = None  # sample labels; used in training
-        self.labels_1 = None  # sample labels; used in training
-        self.labels_all = None  # sample labels; used in training
+        self.labels_0 = None  # list of labels for level 1 gate; used in training
+        self.labels_1 = None  # list of list of labels for each gate at level 2; used in training
+        self.labels_all = None  # list of sample labels;length equal to 1 + number of level 2 gates; used in training
         self.idx_expert = None  # expert labels; used in prediction
         self.probs_expert = None  # expert weights; used in prediction
 
+        # initialize gates and experts
+        self.initialize_gates()
+        self.initialize_experts()
+
+        if self.init_labels_1:
+            if len(set(self.init_labels_1[0])) != self.n_classes_1:
+                raise ValueError(f"The number of classes for initialization should be equal to the number of classes "
+                                 f"set for the model")
+
+        if self.group_by_likelihood and self.num_responses > 200:
+            raise NotImplementedError(f"The current implementation does not support grouping by likelihood when "
+                                      f"number of responses more than 200. Please set group_by_likelihood = False")
+
+
+    def initialize_gates(self):
+        """
+        Initialize gates.
+
+        Raises
+        ------
+            NotImplementedError
+                some gates models are not supported
+
+        """
         # initialize gates
         # -1 for the level 1 gate; level 2 gates are labeled by level 1 classes
         _keys = [-1] + list(range(self.n_classes_0))
@@ -118,6 +154,16 @@ class hme:
         else:
             raise NotImplementedError(f"Now only support decision_tree or logistic")
 
+    def initialize_experts(self):
+        """
+        Initialize experts.
+
+        Raises
+        ------
+            NotImplementedError
+                some experts models are not supported
+
+        """
         # initialize experts
         self.model_experts = defaultdict(dict)
 
@@ -138,10 +184,10 @@ class hme:
             for i in range(self.n_classes_0):
                 for j in range(self.n_classes_1):
                     self.model_experts[i][j] = mrots(lams, no_intercept=False, warm_start=_warm_star,
-                                                     sparse_omega=False, n_iters=_n_iters)
+                                                     sparse_omega=False, n_iters=_n_iters, verbose=False)
 
         elif self.model_name_experts == 'lasso':
-            if self.soft:
+            if self.soft_weights:
                 raise NotImplementedError(f"Weighted learning not available for lasso for now.")
             else:
                 if self.partial_fit_expert:
@@ -171,6 +217,10 @@ class hme:
 
         else:
             raise NotImplementedError(f"Now only support for mrots, lasso or linear.")
+
+    def set_params(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
     @staticmethod
     def train_gate(model, idx_subset, labels, X_train_clf, current_classes):
@@ -661,7 +711,7 @@ class hme:
         idx_0, idx_1 = self.map_sample_to_class(current_classes)
 
         # initialize weight vectors for each expert based on the initialized labels (hard grouping)
-        if self.soft:
+        if self.soft_weights:
             self.weights = np.zeros([N, self.n_experts])
 
             for _c in range(self.n_experts):
@@ -711,7 +761,7 @@ class hme:
             for j in current_classes[0]:  # level 1
                 c0 = current_classes[0][j]
                 for c1 in current_classes[j + 1]:  # level 2
-                    if self.soft:
+                    if self.soft_weights:
                         idx_subset = np.arange(0, N)  # use full-set of training samples
                         weight = self.weights[:, i]
                     else:
@@ -725,7 +775,7 @@ class hme:
                     # weighting the errors from this expert
                     errors_experts.append(np.sum(weight[:, None].T @ errors))
 
-                    if self.GROUP_BY_LIKELIHOOD:
+                    if self.group_by_likelihood:
                         # use assumed distribution (here multivariate Gaussian) for posterior probability
                         if self.model_name_experts == 'mrots':
                             # calculate likelihood with multivaraite Gaussian assumming dependence among responses
@@ -759,7 +809,7 @@ class hme:
             # calculate scores based on errors
             _score = errors_level_0 + sum(errors_level_1) + sum(errors_experts)
 
-            if self.GROUP_BY_LIKELIHOOD:
+            if self.group_by_likelihood:
                 expert_probs = np.array(likelihood_for_all).T
             else:
                 # transform MSE into a 'probability' like form
@@ -774,7 +824,7 @@ class hme:
                 warnings.warn(f"experts weights not sum to 1 for some samples!")
 
             # update the posterior probability
-            if self.soft:
+            if self.soft_weights:
                 self.weights = expectations
 
             # re-assign labels based on the new posterior probability
@@ -873,7 +923,7 @@ class hme:
             probs_1.append(_prob)
 
         # get joint classes probability (expert probability)
-        if self.soft:
+        if self.soft_weights:
             self.probs_expert = self.get_joint_gate_probs(probs_0, probs_1)
 
         # get expert index for each sample
@@ -913,7 +963,7 @@ class hme:
                 i += 1
 
         # get weighted average based on the predictions from experts and gates
-        if self.soft:
+        if self.soft_weights:
             # get the weighted average prediction
             Y_hat_final = np.zeros(Y_hat.shape)
 

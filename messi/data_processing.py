@@ -9,7 +9,6 @@ neighbors and to prepare features and response variables.
 
 import os
 
-
 import numpy as np
 import pandas as pd
 from scipy.spatial import Delaunay
@@ -17,6 +16,8 @@ from scipy.spatial.distance import pdist, squareform
 from sklearn.neighbors import kneighbors_graph
 from sklearn import preprocessing
 from sklearn.preprocessing import PolynomialFeatures
+import matplotlib
+import matplotlib.pyplot as plt
 
 # ------ read data ------
 
@@ -54,7 +55,7 @@ def get_lr_pairs(filename = 'ligand_receptor_pairs2.txt', input_path = 'input/')
     return l_u, r_u
 
 # meta data
-def read_meta_merfish(input_path, behavior_no_space, sex):
+def read_meta_merfish(input_path, behavior_no_space, sex, l_u, r_u):
     """
     Get meta data of merfish hypothalamus datasets.
 
@@ -66,6 +67,10 @@ def read_meta_merfish(input_path, behavior_no_space, sex):
             behavior type of the data (e.g, Virgin_Parenting)
         sex: string
             gender of the animals
+        l_u: set
+            set of ligands
+        r_u: set
+            set of receptors
 
 
     Returns
@@ -80,6 +85,10 @@ def read_meta_merfish(input_path, behavior_no_space, sex):
             all genes that are profiled in the dataset
         genes_list_u: list of strings
             same as genes_list but all letters are in uppercase
+        response_list_prior: list of strings
+            genes that are used as responses based on prior information
+        regulator_list_prior: list of strings
+            genes that are used as regulators based on prior information
 
     """
 
@@ -112,16 +121,179 @@ def read_meta_merfish(input_path, behavior_no_space, sex):
     meta_all_columns = dict(zip(meta_all.columns, range(0,len(meta_all.columns))))
     meta_all = meta_all.to_numpy()
 
-    return meta_all, meta_all_columns, cell_types_dict, genes_list, genes_list_u
+    response_list_prior = None
+    regulator_list_prior = None
+
+    return meta_all, meta_all_columns, cell_types_dict, genes_list, genes_list_u, \
+           response_list_prior, regulator_list_prior
+
+
+# meta data
+def read_meta_merfish_cell_line(input_path, behavior_no_space, sex, l_u, r_u, top_k_response_de=10):
+    """
+    Get meta data of MERFISH U-2 OS cells.
+
+    Parameters
+    ----------
+        input_path: string
+            path to the folder savining the expression data
+        behavior_no_space: string
+            behavior type of the data (e.g, Virgin_Parenting)
+        sex: string
+            gender of the animals
+        l_u: set
+            set of ligands
+        r_u: set
+            set of receptors
+        top_k_response_de: integer
+            number of DE genes to be included in each cluster
+
+
+    Returns
+    -------
+        meta_all: numpy array
+            sample size x meta features, meta data (e.g., animal ID or bregma) for a cell
+        meta_all_columns: dictionary
+            use column name as key for column index
+        cell_types_dict: dictionary
+            cell type as key and 0 as value; include all available cell types
+        genes_list: list of strings
+            all genes that are profiled in the dataset
+        genes_list_u: list of strings
+            same as genes_list but all letters are in uppercase
+        response_list_prior: list of strings
+            genes that are used as responses based on prior information
+        regulator_list_prior: list of strings
+            genes that are used as regulators based on prior information
+
+    """
+
+    # get default values (genes names, all cell types )
+    filename = f"expression_cor_dispersion_10050_B3.csv"
+    sample = pd.read_csv(input_path + filename, header=0)
+
+    # remove columns for quality control
+    genes_list = list(sample.columns[3:])
+    genes_list_u = genes_list
+
+    cell_types_dict = None
+    full_cell_types = None
+
+    # get meta info for current samples
+    meta_all = pd.read_csv(f"{input_path}meta.csv")
+    meta_all.columns = [0, 'Animal_ID', 'ID_in_dataset']
+    meta_all_columns = dict(zip(meta_all.columns, range(0, len(meta_all.columns))))
+    meta_all = meta_all.to_numpy()
+
+    # get prior response list if available
+    de_genes = []
+    for i in range(1, 6):
+        _de = pd.read_csv(f"{input_path}de_genes_c{i}.csv", header=0)
+        de_genes = de_genes + list(_de['Gene'].values[:top_k_response_de])
+
+    de_genes = pd.unique(de_genes)  # remove replicates
+    de_genes = [g.upper().strip() for g in de_genes]  # remove white-space & change to upper case
+
+    # prior response should 1) in filtered gene list
+    g_in_filtered = [g for g in de_genes if g in genes_list_u]
+    # prior response should 2) not ligand or receptor
+    g_not_l_r = [g for g in g_in_filtered if g not in l_u.union(r_u)]
+
+    # get prior regulator list if available
+    de_genes = []
+    for i in range(1, 6):
+        _de = pd.read_csv(f"{input_path}de_genes_c{i}.csv", header=0)
+        de_genes = de_genes + list(_de['Gene'].values)
+
+    de_genes = pd.unique(de_genes)  # remove replicates
+    de_genes = [g.upper().strip() for g in de_genes]  # remove white-space & change to upper case
+
+    # prior response should 1) in filtered gene list
+    g_in_filtered = [g for g in de_genes if g in genes_list_u]
+    g_in_l_r = [g for g in g_in_filtered if g in l_u.union(r_u)]
+
+    response_list_prior = g_not_l_r
+    regulator_list_prior = g_in_l_r
+    assert len(set(response_list_prior).intersection(set(regulator_list_prior))) == 0
+
+    return meta_all, meta_all_columns, cell_types_dict, genes_list, genes_list_u, \
+           response_list_prior, regulator_list_prior
+
+def read_meta_starmap_combinatorial(input_path, behavior_no_space, sex, l_u, r_u):
+    """
+    Get meta data of STARmap combinatorial data (mPFC cells).
+
+    Parameters
+    ----------
+        input_path: string
+            path to the folder savining the expression data
+        behavior_no_space: string
+            behavior type of the data (e.g, Virgin_Parenting)
+        sex: string
+            gender of the animals
+        l_u: set
+            set of ligands
+        r_u: set
+            set of receptors
+
+
+    Returns
+    -------
+        meta_all: numpy array
+            sample size x meta features, meta data (e.g., animal ID or bregma) for a cell
+        meta_all_columns: dictionary
+            use column name as key for column index
+        cell_types_dict: dictionary
+            cell type as key and 0 as value; include all available cell types
+        genes_list: list of strings
+            all genes that are profiled in the dataset
+        genes_list_u: list of strings
+            same as genes_list but all letters are in uppercase
+        response_list_prior: list of strings
+            genes that are used as responses based on prior information
+        regulator_list_prior: list of strings
+            genes that are used as regulators based on prior information
+
+    """
+
+
+    # note their genes in genes.csv and the genes in barcode names not exactly the same (most the same)
+    # barcode corresponding to count
+    # combinatorial
+    filename = 'cell_barcode_names.csv'
+    genes_list = pd.read_csv(f"{input_path}{filename}", header=None)
+    genes_list_u = [g.upper() for g in genes_list.iloc[:,2]]
+
+    meta_file = f"{input_path}meta_mPEC.csv"
+    meta_all = pd.read_csv(meta_file)
+
+    cell_types_dict = meta_all['Cell_class'].value_counts().to_dict()
+
+    for k, v in cell_types_dict.items():
+        cell_types_dict[k] = 0
+
+    full_cell_types = list(cell_types_dict.keys())
+    print(f"Total number of cell types for starmap: {len(full_cell_types)}")
+
+    meta_all_columns = dict(zip(meta_all.columns, range(0,len(meta_all.columns))))
+    meta_all = meta_all.to_numpy()
+
+    response_list_prior = None
+    regulator_list_prior = None
+
+    return meta_all, meta_all_columns, cell_types_dict, genes_list, genes_list_u, \
+           response_list_prior, regulator_list_prior
+
 
 
 # input data
-# parameters for merfish
+# parameters for merfish hypothalamus data
 bregmas_all = [-0.29, -0.24, -0.19, -0.14, -0.09, -0.04, 0.01, 0.06, 0.11, 0.16, 0.21, 0.26]
 female_ids = range(1,5)
 male_ids = range(5,12)
 
-def read_merfish_cell_line_data(input_path, bregma, animal_id, genes_list):
+def read_merfish_cell_line_data(input_path, bregma, animal_id, genes_list, genes_list_u=None,
+                                cutoff=10050):
     """
 
     Read a subset of expression data by animal id and bregma (only for merfish
@@ -136,7 +308,7 @@ def read_merfish_cell_line_data(input_path, bregma, animal_id, genes_list):
 
     """
     try:
-        filename = f"expression_cor_dispersion_6000_{animal_id}.csv"
+        filename = f"expression_cor_dispersion_{cutoff}_{animal_id}.csv"
         print(f"Reading file: {filename}")
         sample = pd.read_csv(os.path.join(input_path, filename), header=0)
 
@@ -154,7 +326,7 @@ def read_merfish_cell_line_data(input_path, bregma, animal_id, genes_list):
     except FileNotFoundError:
         print(f"No file exist for this {bregma} of {animal_id}")
 
-def read_merfish_data(input_path, bregma, animal_id, genes_list):
+def read_merfish_data(input_path, bregma, animal_id, genes_list, genes_list_u=None):
     """
 
     Read a subset of expression data by animal id and bregma (only for merfish
@@ -190,7 +362,7 @@ def read_merfish_data(input_path, bregma, animal_id, genes_list):
     except FileNotFoundError:
         print(f"No file exist for this {bregma} of {animal_id}")
         
-def read_starmap_combinatorial(input_path, animal_id, genes_list):
+def read_starmap_combinatorial(input_path, bregma, animal_id, genes_list, genes_list_u=None):
 
     """
 
@@ -224,7 +396,7 @@ def read_starmap_combinatorial(input_path, animal_id, genes_list):
         filename = f"cell_barcode_count_{animal_id}.csv"
         print(f"Reading file: {filename}")
         genes = pd.read_csv(os.path.join(input_path, filename), header = None)
-        genes.columns = genes_list
+        genes.columns = genes_list_u
         print (f"The dimensions of the expression is: {genes.shape}")
 
         return meta, cor, genes
@@ -410,6 +582,9 @@ def get_idx_per_dataset_merfish_cell_line(samples, meta_all, meta_all_columns,
     for animal in samples:
         print(animal)
 
+        if animal == '':
+            continue
+
         _condition = (meta_all[:, meta_all_columns['Animal_ID']] == animal)
 
         #         _idx_in_all = list(meta_all.index[_condition].values)
@@ -439,6 +614,9 @@ def get_idx_per_dataset_starmap_combinatorial(samples, meta_all, meta_all_column
 
     for animal in samples:
         print(animal)
+
+        if animal == '':
+            continue
 
         if current_cell_type is not None:
             _condition = (meta_all[:, meta_all_columns['Animal_ID']] == animal) & \
@@ -502,7 +680,7 @@ def get_idx_per_dataset_merfish(samples, meta_all, meta_all_columns, single_breg
                 (meta_all[:, meta_all_columns['Bregma']] == bregma)
 
             _subidx = np.where(_condition)[0]
-            _subset = meta_all[_condition,:]
+            _subset = meta_all[_condition, :]
             idx_in_all_animal = idx_in_all_animal + list(_subidx)
             idx_in_dataset.append(list(_subset[:,meta_all_columns['ID_in_dataset']]))
             meta_per_dataset.append([animal,bregma])
@@ -743,7 +921,27 @@ def prepare_features(data_type, datasets_train, datasets_test, meta_per_dataset_
 
         total_regulators = regulator_list_neighbor + regulator_list_self
 
-    # transform features: log + standardize
+    return X_trains, X_tests, regulator_list_neighbor, regulator_list_self
+
+
+def transform_features(X_trains, X_tests, feature_types):
+    """
+
+    Transform features according to the parameters specified in feature_types.
+
+    Parameters
+    -----------
+        X_trains: dictionary
+            each item for a type of features
+        X_tests: dictionary
+            each item for a type of features
+        feature_types: dictionary
+            each specifying parameters of a particular feature type
+
+
+    """
+
+    # transform features:
     for i in range(0, len(feature_types)):
         feature_type = feature_types[i]
         feature_name = feature_type['name']
@@ -751,6 +949,7 @@ def prepare_features(data_type, datasets_train, datasets_test, meta_per_dataset_
         log = feature_type['log']
         standardize = feature_type['standardize']
         feature_poly = feature_type['poly']
+
         print(
             f"Now transform for feature: {feature_name} by polynomial: {feature_poly}, natural log: {log}, standardize(z-score): {standardize}")
 
@@ -767,7 +966,7 @@ def prepare_features(data_type, datasets_train, datasets_test, meta_per_dataset_
             X_train = np.log1p(X_train)
             X_test = np.log1p(X_test)
 
-        if standardize:
+        if standardize:  # last step of data processing
             scaler = preprocessing.StandardScaler().fit(X_train)
             X_train = scaler.transform(X_train)
             if np.ndim(X_test) == np.ndim(X_train):
@@ -777,7 +976,6 @@ def prepare_features(data_type, datasets_train, datasets_test, meta_per_dataset_
         X_trains[feature_name] = X_train
         X_tests[feature_name] = X_test
 
-    return X_trains, X_tests, regulator_list_neighbor, regulator_list_self
 
 
 def preprocess_concatenate_X_datasets(data_sets, meta_per_dataset, data_type, current_idxs,
@@ -1331,6 +1529,153 @@ def prepare_responses(data_type, datasets_train, datasets_test, idx_train_in_gen
     return Y_train, Y_train_true, Y_test, Y_test_true, response_list
 
 
+def cutSpaces(sample, xs, ys, n_part=3):
+    """
+
+    For a list of items with x and y coordinates, split the items in
+    n_part for x and y dimension (thus, in total n_part^2 partitions).
+    For each dimension, the items closed to each other will be grouped
+    together. Try to have similar number of items per partition but not
+    necessary the same number.
+
+
+    Parameters
+    ----------
+        sample: string
+            name of the current sample
+        xs: 1-D numpy array
+            x-axis coordinates of the items
+        ys: 1-D numpy array
+            y-axis coordinates of the items
+        n_part: integer
+            number of partitions for each dimension; square root of the
+            total number of partitions for the 2 dimensions
+
+    Returns
+    -------
+        metas: list of tuples of strings
+            meta data for a single validation/train set; each sublist in the form of ('sample_id', 'partition_id') \
+            for each dataset selected for validation/train
+        meta_idx: dictionary
+            key as ('sample_id', 'partition_id'), value as the list of
+            index of the items in the parition
+
+    """
+    # must have same number of elements
+    assert xs.shape[0] == ys.shape[0]
+
+    # split list index after sorting in asending order
+    group_x = np.array_split(xs.argsort(), n_part)
+    group_y = np.array_split(ys.argsort(), n_part)
+
+    # initalize
+    idx_part = np.zeros(xs.shape)
+    metas = [(sample, i) for i in range(n_part ** 2)]
+    meta_idx = dict.fromkeys(metas)
+
+    mark = 0
+    for i in range(n_part):
+        for j in range(n_part):
+            shared_idx = list(set(group_x[i]).intersection(group_y[j]))
+
+            idx_part[shared_idx] = mark
+            meta_idx[(sample, mark)] = shared_idx
+
+            mark += 1
+
+    # visualize splitting
+    # import seaborn as sns
+    # sns.scatterplot(x=xs, y=ys, hue=idx_part, palette='Set1')
+    # plt.savefig(f"visualize_splitting_{sample}_{n_part}.png")
+    # plt.close()
+
+    return metas, meta_idx
+
+
+def combineParts(samples, datasets, current_idxs):
+    """
+
+    Combine the partitions per dataset together and transform the index as in the full training data.
+
+    Parameters
+    ----------
+    samples: list
+        sample ID for training data; here sample might be 'animals'(merFISH) or 'FOV'(seqFISH+)
+    datasets: list of numpy arrays & dictionaries
+        all info for training samples;in the format of [current_meta, gene_exp, current_cor]
+    current_idxs: list of list of integers
+        each sublist corresponds to list of index of cells in each dataset
+
+    Returns
+    -------
+    meta_per_part: list of tuples of strings
+        meta data for a single validation/train set; each sublist in the form of ('sample_id', 'partition_id') \
+        for each dataset selected for validation/train
+    meta_idx: dictionary
+        key as ('sample_id', 'partition_id'), value as the list of
+        index, w.r.t the full training data, of the items in the partition
+
+    """
+
+    meta_per_part = []
+    meta_idx = {}
+    idx_start = 0
+
+    for i in range(len(current_idxs)):
+        # cut each sample into partitions
+        sample = samples[i]
+        cur_data = datasets[i]
+        current_idx = current_idxs[i]
+
+        xs = cur_data[2][current_idx, 0]
+        ys = cur_data[2][current_idx, 1]
+        metas, meta_idx_sub = cutSpaces(sample, xs, ys, n_part=3)
+
+        meta_per_part += metas
+
+        if i == 0:
+            meta_idx = meta_idx_sub
+        else:
+            # update the index as in the combined datasets
+            for key, value in meta_idx_sub.items():
+                meta_idx[key] = [idx_ori + idx_start for idx_ori in value]
+
+        # the start index appears after the previous datasets
+        idx_start += xs.shape[0]
+
+    return meta_per_part, meta_idx
+
+def meta2idx(current_idxs, meta_per_dataset):
+    """
+
+    Map meta information of a dataset to the indexes of its samples in the full data.
+
+    Parameters
+    ----------
+        current_idxs: list of list of integers
+            each sublist corresponds to list of index of cells in each dataset
+        meta_per_dataset: list of list of strings
+            each sublist in the form of ['animal_id', 'bregma'] for each dataset
+
+    Returns
+    -------
+        meta2idx: dictionary
+            key as ['animal_id', 'bregma'], value as the start and end index + 1 of the samples in the full data
+
+    """
+    meta2idx = dict.fromkeys(meta_per_dataset)
+    idx_start = 0
+    idx_end = 0
+
+    for i in range(len(current_idxs)):
+        current_idx = current_idxs[i]
+        current_meta = meta_per_dataset[i]
+        idx_end += len(current_idx)
+        meta2idx[current_meta] = [idx_start, idx_end]
+        idx_start = idx_end
+
+    return meta2idx
+
 def preprocess_Y_datasets(data_sets, data_type, current_idxs, current_idx_in_general,
                           feature_list, bins, response_type, baseline_file=None, log=False, transformer=None,
                           scale=False):
@@ -1428,10 +1773,8 @@ def preprocess_Y_datasets(data_sets, data_type, current_idxs, current_idx_in_gen
             temp = Y_dif[feature_list].apply(lambda x: pd.cut(x, bins, labels=[0, 1, 2]), axis=1)
             return temp, transformer
     else:
-
         print("Please provide the filename of the baseline prediction.")
-        return '_', '_', '_'
-
+        return None, None, None
 
 # --- filter
 
@@ -1478,9 +1821,16 @@ def combine_features(features, preprocess, num_coordinates):
     """
     if 'neighbor' not in preprocess:
 
-        X = np.concatenate((features['regulators_neighbor_self'], features['regulators_self']), axis=1)
-        X_clf = X
-        X_full = X
+        if 'baseline' in preprocess:
+            # baseline model
+            X = features['baseline']
+            X_clf = X
+            X_full = X
+
+        else:
+            X = np.concatenate((features['regulators_neighbor_self'], features['regulators_self']), axis=1)
+            X_clf = X
+            X_full = X
 
     else:
 
