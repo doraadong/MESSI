@@ -27,7 +27,6 @@ import numpy as np
 import pandas as pd
 from sklearn.cluster import AgglomerativeClustering
 
-from context import messi
 from messi.data_processing import *
 from messi.hme import hme
 from messi.gridSearch import gridSearch
