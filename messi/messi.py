@@ -119,7 +119,7 @@ def main():
     mode = args.mode
     grid_search = args.grid_search
     n_sets = int(args.n_sets)
-    n_classes_0 = int(args.numLevel1)-
+    n_classes_0 = int(args.numLevel1)
     n_classes_1 = int(args.numLevel2)
     n_epochs = int(args.epochs)
     n_replicates = int(args.numReplicates)
