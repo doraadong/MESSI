@@ -99,17 +99,20 @@ messi -i ../input/ -o ../output/ -d merfish -g Female -b Parenting -c Excitatory
 The usage of this file is listed as follows:  
 
 ```shell
-usage: messi [-h] -i INPUT -o OUTPUT -d {merfish,merfish_cell_line,starmap} -g
-             GENDER -b BEHAVIOR -c CELLTYPE -m MODE [-c1 NUMLEVEL1]
-             [-c2 NUMLEVEL2] [-e EPOCHS] [-gs GRID_SEARCH] [-ns N_SETS]
-             [-r NUMREPLICATES] [-p PREPROCESS] [-tr TOPKRESPONSES]
-             [-ts TOPKSIGNALS]
+usage: messi [-h] -i INPUT [-ilr INPUT_LR] -o OUTPUT -d
+             {merfish,merfish_cell_line,starmap} -g GENDER -b BEHAVIOR -c
+             CELLTYPE -m MODE [-c1 NUMLEVEL1] [-c2 NUMLEVEL2] [-e EPOCHS]
+             [-gs GRID_SEARCH] [-ns N_SETS] [-r NUMREPLICATES] [-p PREPROCESS]
+             [-tr TOPKRESPONSES] [-ts TOPKSIGNALS]
 
 optional arguments:
   -h, --help            show this help message and exit
   -i INPUT, --input INPUT
                         string, path to the input folder with the expression
                         data, default 'input/'
+  -ilr INPUT_LR, --input_lr INPUT_LR
+                        string, optional, path to the input folder with the
+                        ligands and receptors list, default 'input/'
   -o OUTPUT, --output OUTPUT
                         string, path to the output folder, default 'output/'
   -d {merfish,merfish_cell_line,starmap}, --dataType {merfish,merfish_cell_line,starmap}
@@ -134,18 +137,21 @@ optional arguments:
                         animal/sample left out and each CV run output a pickle
                         file and prediction result, default 'train'
   -c1 NUMLEVEL1, --numLevel1 NUMLEVEL1
-                        integer, number of classes at level 1, number of
-                        experts = number of classes at level 1 x number of
-                        classes at level 2, default 1
+                        integer, optional, number of classes at level 1,
+                        number of experts = number of classes at level 1 x
+                        number of classes at level 2, default 1
   -c2 NUMLEVEL2, --numLevel2 NUMLEVEL2
-                        integer, number of classes at level 2, default 5
+                        integer, optional, number of classes at level 2,
+                        default 5
   -e EPOCHS, --epochs EPOCHS
-                        integer, number of epochs to train MESSI, default 20
+                        integer, optional, number of epochs to train MESSI,
+                        default 20
   -gs GRID_SEARCH, --grid_search GRID_SEARCH
-                        boolean, if conduct grid search for hyper-parameters,
-                        default False
+                        boolean, optional, if conduct grid search for hyper-
+                        parameters, default False
   -ns N_SETS, --n_sets N_SETS
-                        integer, number of CV sets for grid search, default 3
+                        integer, optional, number of CV sets for grid search,
+                        default 3
   -r NUMREPLICATES, --numReplicates NUMREPLICATES
                         integer, optional, number of times to run with same
                         set of parameters, default 1
