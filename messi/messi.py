@@ -47,8 +47,8 @@ def main():
                         default='input/', help="string, path to the input folder with the expression data, "
                                                   "default 'input/'")
     parser.add_argument('-ilr', '--input_lr', required=False,
-                        default='input/', help="string, path to the input folder with the ligands and receptors list, "
-                                               "default 'input/'")
+                        default='input/', help="string, optional, path to the input folder with the ligands and "
+                                               "receptors list, default 'input/'")
     parser.add_argument('-o', '--output', required=True,
                         default='output/', help="string, path to the output folder, default 'output/'")
     parser.add_argument('-d', '--dataType', required=True,
@@ -72,16 +72,18 @@ def main():
                                               "left out and each CV run output a pickle file and prediction result, "
                                               "default 'train'")
     parser.add_argument('-c1', '--numLevel1', required=False,
-                        default=1, help="integer, number of classes at level 1, number of experts = number of classes "
+                        default=1, help="integer, optional, number of classes at level 1, number of experts = "
+                                        "number of classes "
                                         "at level 1 x number of classes at level 2, default 1")
     parser.add_argument('-c2', '--numLevel2', required=False,
-                        default=5, help="integer, number of classes at level 2, default 5")
+                        default=5, help="integer, optional, number of classes at level 2, default 5")
     parser.add_argument('-e', '--epochs', required=False,
-                        default=20, help="integer, number of epochs to train MESSI, default 20")
+                        default=20, help="integer, optional, number of epochs to train MESSI, default 20")
     parser.add_argument('-gs', '--grid_search', required=False, type=str2bool,
-                        default=False, help="boolean, if conduct grid search for hyper-parameters, default False")
+                        default=False, help="boolean, optional, if conduct grid search for hyper-parameters, "
+                                            "default False")
     parser.add_argument('-ns', '--n_sets', required=False,
-                        default=3, help="integer, number of CV sets for grid search, default 3")
+                        default=3, help="integer, optional, number of CV sets for grid search, default 3")
     parser.add_argument('-r', '--numReplicates', required=False,
                         default=1, help="integer, optional, number of times to run with same set of parameters, "
                                         "default 1")
