@@ -46,6 +46,9 @@ def main():
     parser.add_argument('-i', '--input', required=True,
                         default='input/', help="string, path to the input folder with the expression data, "
                                                   "default 'input/'")
+    parser.add_argument('-ilr', '--input_lr', required=False,
+                        default='input/', help="string, path to the input folder with the ligands and receptors list, "
+                                               "default 'input/'")
     parser.add_argument('-o', '--output', required=True,
                         default='output/', help="string, path to the output folder, default 'output/'")
     parser.add_argument('-d', '--dataType', required=True,
@@ -106,6 +109,7 @@ def main():
 
     # set parameters for data
     input_path = args.input
+    input_path_lr = args.input_lr
     output_path = args.output
     data_type = args.dataType
     sex = args.gender
@@ -157,7 +161,7 @@ def main():
         raise NotImplementedError(f"Now only support processing 'merfish', 'merfish_cell_line' or 'starmap'")
 
     # read in ligand and receptor lists
-    l_u, r_u = get_lr_pairs()  # may need to change to the default value
+    l_u, r_u = get_lr_pairs(input_path=input_path_lr)  # may need to change to the default value
 
     # read in meta information about the dataset
     meta_all, meta_all_columns, cell_types_dict, genes_list, genes_list_u, \
