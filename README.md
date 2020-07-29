@@ -179,6 +179,9 @@ See [tutorials/MESSI for MERFISH hypothalamus](tutorials/tutorial_v2_MERFISH_hyp
   * Analyze the model parameters to infer cell subtypes differ in signaling genes
   * Train and test the data with other model configurations 
 
+# Learn more
+Check our [paper at bioRxiv](https://www.biorxiv.org/content/10.1101/2020.07.27.221465v1) for more information.
+
 # Credits
 The software is an implementation of the method MESSI, jointly developed by Dora Li, [Jun Ding](https://github.com/phoenixding) and Ziv Bar-Joseph from [System Biology Group @ Carnegie Mellon University](http://sb.cs.cmu.edu/).  
 
