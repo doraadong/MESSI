@@ -180,7 +180,7 @@ See [tutorials/MESSI for MERFISH hypothalamus](tutorials/tutorial_v2_MERFISH_hyp
   * Train and test the data with other model configurations 
 
 # Learn more
-Check our [paper at bioRxiv](https://www.biorxiv.org/content/10.1101/2020.07.27.221465v2) for more information.
+Check our [paper published in *Bioinformatics*](https://doi.org/10.1093/bioinformatics/btaa769) for more information. The pre-print version is available at [*biorxiv*]((https://www.biorxiv.org/content/10.1101/2020.07.27.221465v2))
 
 # Credits
 The software is an implementation of the method MESSI, jointly developed by Dora Li, [Jun Ding](https://github.com/phoenixding) and Ziv Bar-Joseph from [System Biology Group @ Carnegie Mellon University](http://sb.cs.cmu.edu/).  
