@@ -179,6 +179,12 @@ See [tutorials/MESSI for MERFISH hypothalamus](tutorials/tutorial_v2_MERFISH_hyp
   * Analyze the model parameters to infer cell subtypes differ in signaling genes
   * Train and test the data with other model configurations 
 
+We also prepared [tutorials/results reprudction](tutorials/results_reproduction_MERFISH_hypothalamus.ipynb) to reproduce MESSI's results shown in our manuscript.
+
+# Updates-log 
+* 2-20-2022:  
+-- Uploaded the jupyter notebook for reproducing MESSI's results shown in the manuscript 
+
 # Learn more
 Check our [paper published in *Bioinformatics*](https://doi.org/10.1093/bioinformatics/btaa769) for more information. The pre-print version is available at [*biorxiv*](https://www.biorxiv.org/content/10.1101/2020.07.27.221465v2).
 
