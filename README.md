@@ -8,6 +8,8 @@ MESSI (**M**ixture of **E**xperts for **S**patial **S**ignaling genes **I**denti
 - [Command-line tools](#Command-line)
 - [Tutorials](#Tutorials)
 - [Updates-log](#Updates-log)
+- [Learn more](#Learn-more)
+- [Credits](#Credits)
 
 # Get started 
 ## Prerequisites 
@@ -186,7 +188,7 @@ We also prepared [tutorials/results reprudction](tutorials/results_reproduction_
 * 2-20-2022:  
 -- Uploaded the jupyter notebook for reproducing MESSI's results shown in the manuscript 
 
-# Learn more
+# Learn-more
 Check our [paper published in *Bioinformatics*](https://doi.org/10.1093/bioinformatics/btaa769) for more information. The pre-print version is available at [*biorxiv*](https://www.biorxiv.org/content/10.1101/2020.07.27.221465v2).
 
 # Credits
