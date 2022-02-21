@@ -7,6 +7,7 @@ MESSI (**M**ixture of **E**xperts for **S**patial **S**ignaling genes **I**denti
 - [Get started](#Get&nbsp;started)
 - [Command-line tools](#Command-line)
 - [Tutorials](#Tutorials)
+- [Updates-log](#Updates-log)
 
 # Get started 
 ## Prerequisites 
