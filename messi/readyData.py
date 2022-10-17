@@ -133,7 +133,8 @@ def main():
 
     # set parameters specific to the data type
     if data_type == 'merfish':
-        url = "https://datadryad.org/stash/downloads/file_stream/68364"
+        # url = "https://datadryad.org/stash/downloads/file_stream/68364"
+        url = "https://datadryad.org/stash/downloads/file_stream/67671"
         process_raw = process_merfish_raw
     else:
         raise NotImplementedError(f"Now only support processing MERFISH hypothalamus data.")
